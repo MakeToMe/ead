@@ -17,7 +17,7 @@ let cachedUser: User | null | undefined = undefined
 
 async function fetchUser(): Promise<User | null> {
   try {
-    const res = await fetch("/api/auth/me", { method: "GET" })
+    const res = await fetch("/api/auth/me", { method: "GET", credentials: "include" })
     if (!res.ok) return null
     const { user } = (await res.json()) as { user: User }
     return user
@@ -50,13 +50,14 @@ export function clearCachedUser() {
 }
 
 export async function clientSignOut(): Promise<void> {
-  await fetch("/api/auth/signout", { method: "POST" })
+  await fetch("/api/auth/signout", { method: "POST", credentials: "include" })
   clearCachedUser()
 }
 
 /**************** HTTP helper ****************/
 async function postJson<T>(url: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(url, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

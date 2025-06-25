@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs"
 import { cookies } from "next/headers"
 import { createServerSupabaseClient } from "./supabase/server"
+import { verifyJwt } from "./auth-jwt"
 
 export interface User {
   uid: string
@@ -54,7 +55,21 @@ export async function createSession(userId: string) {
 // Função para obter usuário da sessão
 export async function getCurrentUser(): Promise<User | null> {
   const cookieStore = await cookies()
-  const userId = cookieStore.get("userId")?.value
+
+  // 1. Tenta via JWT HTTP-only (cookie "session")
+  const jwtToken = cookieStore.get("session")?.value
+  let userId: string | undefined
+  if (jwtToken) {
+    const payload = verifyJwt(jwtToken)
+    if (payload) {
+      userId = payload.uid
+    }
+  }
+
+  // 2. Fallback para cookie "userId" (legacy)
+  if (!userId) {
+    userId = cookieStore.get("userId")?.value
+  }
 
   if (!userId) {
     return null
@@ -62,11 +77,9 @@ export async function getCurrentUser(): Promise<User | null> {
 
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase.from("users").select("*").eq("uid", userId).single()
-
   if (error || !data) {
     return null
   }
-
   return data as User
 }
 

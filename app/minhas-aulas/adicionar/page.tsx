@@ -105,6 +105,9 @@ export default function AdicionarAulaPage() {
   const [filePreview, setFilePreview] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
+  // Navegação
+  const router = useRouter()
+
   // Estados para novo módulo
   const [novoModulo, setNovoModulo] = useState("")
   const [criandoModulo, setCriandoModulo] = useState(false)
@@ -130,7 +133,6 @@ export default function AdicionarAulaPage() {
   const savedSelectionRef = useRef<Range | null>(null)
 
   const { toast } = useToast()
-  const router = useRouter()
 
   const [formData, setFormData] = useState({
     curso_id: "",
@@ -284,12 +286,6 @@ export default function AdicionarAulaPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      console.log("Arquivo selecionado:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: file.lastModified,
-      })
 
       // Verificar tipo de arquivo baseado no tipo da aula
       if (formData.tipo === "video") {
@@ -312,13 +308,13 @@ export default function AdicionarAulaPage() {
         }
       }
 
-      // Verificar tamanho (máximo 100MB para desenvolvimento)
-      const maxSize = 100 * 1024 * 1024 // 100MB
+      // Verificar tamanho (máximo 3GB)
+      const maxSize = 3 * 1024 * 1024 * 1024 // 3GB
       if (file.size > maxSize) {
         toast({
           variant: "destructive",
           title: "Arquivo muito grande",
-          description: "Para desenvolvimento, use arquivos menores que 100MB",
+          description: "O arquivo excede o limite de 3GB",
         })
         return
       }
@@ -497,7 +493,7 @@ export default function AdicionarAulaPage() {
 
         const fileSize = (selectedFile.size / 1024 / 1024).toFixed(2)
 
-        console.log(`🚀 Iniciando upload direto para MinIO - ${fileSize}MB`)
+
 
         toast({
           title: "📤 Enviando arquivo...",
@@ -522,7 +518,7 @@ export default function AdicionarAulaPage() {
         }
 
         mediaUrl = uploadResult.url
-        console.log("✅ Upload concluído com sucesso:", mediaUrl)
+
 
         toast({
           variant: "success",
@@ -551,7 +547,6 @@ export default function AdicionarAulaPage() {
         ativo: formData.ativo,
       }
 
-      console.log("Dados da aula a serem salvos:", aulaData)
 
       const result = await criarAula(aulaData, currentUser.uid)
 
@@ -1018,8 +1013,8 @@ export default function AdicionarAulaPage() {
                         </p>
                         <p className="text-slate-500 text-xs">
                           {formData.tipo === "video"
-                            ? "MP4, AVI, MOV, WMV, WebM, MKV (máx. 100MB para dev)"
-                            : "Apenas arquivos PDF (máx. 100MB)"}
+                            ? "MP4, AVI, MOV, WMV, WebM, MKV (máx. 3GB para dev)"
+                            : "Apenas arquivos PDF (máx. 3GB)"}
                         </p>
                         <p className="text-emerald-400 text-xs mt-1">✨ Envio rápido e seguro!</p>
                       </div>

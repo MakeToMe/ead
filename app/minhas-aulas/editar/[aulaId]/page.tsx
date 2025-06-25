@@ -359,12 +359,7 @@ export default function EditarAulaPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      console.log("Arquivo selecionado:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: file.lastModified,
-      })
+
 
       // Verificar tipo de arquivo baseado no tipo da aula
       if (formData.tipo === "video") {
@@ -387,13 +382,13 @@ export default function EditarAulaPage() {
         }
       }
 
-      // Verificar tamanho (máximo 100MB para desenvolvimento)
-      const maxSize = 100 * 1024 * 1024 // 100MB
+      // Verificar tamanho (máximo 3GB)
+      const maxSize = 3 * 1024 * 1024 * 1024 // 3GB
       if (file.size > maxSize) {
         toast({
           variant: "destructive",
           title: "Arquivo muito grande",
-          description: "Para desenvolvimento, use arquivos menores que 100MB",
+          description: "O arquivo excede o limite de 3GB",
         })
         return
       }
@@ -573,7 +568,7 @@ export default function EditarAulaPage() {
 
         const fileSize = (selectedFile.size / 1024 / 1024).toFixed(2)
 
-        console.log(`🚀 Iniciando upload direto para MinIO - ${fileSize}MB`)
+        
 
         toast({
           title: "📤 Enviando arquivo...",
@@ -598,7 +593,7 @@ export default function EditarAulaPage() {
         }
 
         mediaUrl = uploadResult.url
-        console.log("✅ Upload concluído com sucesso:", mediaUrl)
+        
 
         toast({
           variant: "success",
@@ -627,7 +622,7 @@ export default function EditarAulaPage() {
         ativo: formData.ativo,
       }
 
-      console.log("Dados da aula a serem salvos:", aulaData)
+      
 
       const result = await editarAula(aulaId, aulaData, currentUser.uid)
 
@@ -1098,8 +1093,8 @@ export default function EditarAulaPage() {
                         </p>
                         <p className="text-slate-500 text-xs">
                           {formData.tipo === "video"
-                            ? "MP4, AVI, MOV, WMV, WebM, MKV (máx. 100MB para dev)"
-                            : "Apenas arquivos PDF (máx. 100MB)"}
+                            ? "MP4, AVI, MOV, WMV, WebM, MKV (máx. 3GB para dev)"
+                            : "Apenas arquivos PDF (máx. 3GB)"}
                         </p>
                         <p className="text-emerald-400 text-xs mt-1">✨ Envio rápido e seguro!</p>
                       </div>

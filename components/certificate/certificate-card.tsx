@@ -4,10 +4,14 @@ import { Rotate3D } from "lucide-react"
 import CertificateTemplate, { CertificateProps } from "./certificate-template"
 import CertificateBack from "./certificate-back"
 
-interface AulaInfo { id: number; titulo: string; duracao?: number }
-interface ModuleInfo { id: number; titulo: string; aulas: AulaInfo[] }
+interface AulaInfo { id: string; titulo: string; duracao?: number }
+interface ModuleInfo { id: string; titulo: string; aulas: AulaInfo[] }
 
 interface CertificateCardProps extends CertificateProps {
+  links?: Record<string,string>
+  visibility?: Record<string, boolean | undefined>
+  editable?: boolean
+  certId?: string
   logoUrl?: string
   issueDate: string
   validity: string
@@ -39,6 +43,10 @@ export default function CertificateCard({
   duration,
   avatarUrl,
   email,
+  links = {},
+  visibility = {},
+  editable = false,
+  certId,
 }: CertificateCardProps) {
   const [flipped, setFlipped] = useState(false)
   return (
@@ -64,6 +72,7 @@ export default function CertificateCard({
           <div className="absolute inset-0 w-full h-full rotate-y-180 [backface-visibility:hidden]">
             <CertificateBack
               provider={provider}
+              courseTitle={course}
               logoUrl={logoUrl}
               issueDate={issueDate}
               validity={validity}
@@ -76,6 +85,10 @@ export default function CertificateCard({
               avatarUrl={avatarUrl}
               studentName={name}
               email={email}
+              links={links}
+              visibility={visibility}
+              editable={editable}
+              certId={certId}
             />
           </div>
         </div>

@@ -1,19 +1,21 @@
 "use client"
 import { Shield } from "lucide-react"
+import SocialLinksDisplay from "./social-links-display"
 
 interface AulaInfo {
-  id: number
+  id: string
   titulo: string
   duracao?: number
 }
 
 interface ModuleInfo {
-  id: number
+  id: string
   titulo: string
   aulas: AulaInfo[]
 }
 
 interface CertificateBackProps {
+  courseTitle?: string
   provider: string
   logoUrl?: string
   issueDate: string
@@ -27,10 +29,15 @@ interface CertificateBackProps {
   avatarUrl?: string
   studentName: string
   email?: string
+  links?: Record<string,string>
+  visibility?: Record<string, boolean | undefined>
+  editable?: boolean
+  certId?: string
 }
 
 export default function CertificateBack({
   provider,
+  courseTitle,
   logoUrl,
   issueDate,
   validity,
@@ -43,6 +50,10 @@ export default function CertificateBack({
   avatarUrl,
   studentName,
   email,
+  links = {},
+  visibility = {},
+  editable = false,
+  certId,
 }: CertificateBackProps) {
   return (
     <div className="w-full h-full p-4 lg:p-8 flex items-center justify-center">
@@ -82,12 +93,17 @@ export default function CertificateBack({
 
         {/* Card Central */}
         <div className="lg:col-span-4 bg-white rounded-lg shadow p-4">
-          <h2 className="text-2xl font-bold mb-4">Conteúdo do Curso</h2>
-          <p className="mb-2 text-gray-700">Módulos: {modulesCount} • Aulas: {aulasCount} • Duração: {duration}</p>
-          <div className="space-y-4 pr-2 max-h-[400px] overflow-y-auto">
+          <h2 className="text-2xl font-bold mb-2">Conteúdo do Curso</h2>
+          {courseTitle && <p className="font-semibold text-gray-800 mb-1">{courseTitle}</p>}
+          <ul className="text-gray-700 mb-4 space-y-1">
+            <li>Módulos: {modulesCount}</li>
+            <li>Aulas: {aulasCount}</li>
+            <li>Duração: {duration}</li>
+          </ul>
+          <div className="space-y-4 pr-2 max-h-[400px] overflow-y-auto custom-scrollbar">
             {modules.map((m, idx) => (
               <div key={m.id} className="">
-                <p className="font-semibold mb-1 text-purple-700">Módulo {idx + 1}: {m.titulo}</p>
+                <p className="font-semibold mb-1 text-purple-700">{m.titulo}</p>
                 <ul className="pl-4 list-disc space-y-1">
                   {m.aulas.map((a) => (
                     <li key={a.id} className="flex justify-between text-sm text-gray-700">
@@ -122,6 +138,12 @@ export default function CertificateBack({
             <p className="font-semibold">{studentName}</p>
           </div>
           {email && <p className="text-gray-600 text-sm">{email}</p>}
+          {Object.keys(links).length > 0 && (
+            <div className="w-full">
+              {/* @ts-ignore */}
+              <SocialLinksDisplay links={links} visibility={visibility} editable={editable} certId={editable ? certId : undefined} />
+            </div>
+          )}
         </div>
       </div>
     </div>

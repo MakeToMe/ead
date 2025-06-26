@@ -26,6 +26,7 @@ import {
 import { getUserFreshData, updateUserProfile, getSignedPhotoUrl } from "./actions"
 import ModalUploadFoto from "./components/modal-upload-foto"
 import VerificacaoContato from "./components/verificacao-contato"
+import SocialLinksCard from "./components/social-links-card"
 
 export default function PerfilPage() {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -441,6 +442,11 @@ export default function PerfilPage() {
             )}
           </div>
         </motion.div>
+
+        {/* Card Redes Sociais */}
+        {user && (
+          <SocialLinksCard userId={user.uid} initialLinks={(user as any).social_links ?? {}} />
+        )}
 
         {/* Seção de configurações adicionais */}
         <motion.div

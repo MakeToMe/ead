@@ -12,7 +12,8 @@ async function getCertificadoPublico(hash: string) {
   const { data: certificado, error } = await supabase
     .from("certificados")
     .select(
-      `numero_certificado,
+      `id,
+       numero_certificado,
        curso_id,
        aluno_id,
        nome_aluno,
@@ -20,7 +21,8 @@ async function getCertificadoPublico(hash: string) {
        descricao_curso,
        carga_horaria,
        status,
-       emitido_em`
+       emitido_em,
+       social_visibility`
     )
     .eq("hash_verificacao", hash)
     .single()
@@ -43,11 +45,12 @@ async function CertificadoPublicoContent({ hash }: { hash: string }) {
   // Buscar dados do aluno
   const { data: aluno } = await supabase
     .from("users")
-    .select("email, url_foto")
+    .select("email, url_foto, social_links")
     .eq("uid", certificado?.aluno_id)
     .single()
 
   let avatarUrl: string | undefined = aluno?.url_foto ?? undefined
+  let socialLinks: Record<string,string> = aluno?.social_links ?? {}
   if (avatarUrl && !avatarUrl.startsWith("http")) {
     const relativePath = avatarUrl.replace(/^ead\//, "")
     avatarUrl = `/api/avatar/${encodeURIComponent(relativePath)}`
@@ -77,9 +80,8 @@ async function CertificadoPublicoContent({ hash }: { hash: string }) {
 
   const validity = "Não expira"
   const hashAuth = hash
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-    `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://saber365.com"}/certificado/${hash}`
-  )}`
+  const baseUrl = process.env.URL_BASE ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://saber365.app"
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${baseUrl}/certificado/${hash}`)}`
   
   
   
@@ -112,8 +114,12 @@ async function CertificadoPublicoContent({ hash }: { hash: string }) {
       modulesCount={modulesCount}
       aulasCount={aulasCount}
       duration={durationTotal}
+      links={socialLinks}
+      visibility={certificado.social_visibility ?? {}}
       avatarUrl={avatarUrl}
       email={aluno?.email ?? undefined}
+      editable={false}
+      certId={certificado?.id ?? undefined}
     />
   )
 }

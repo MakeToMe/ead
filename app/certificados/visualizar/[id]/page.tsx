@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Download, ExternalLink, Award, ArrowLeft } from "lucide-react"
 import CertificateCard from "@/components/certificate/certificate-card"
+import CertificadoActions from "./components/certificado-actions"
 import { CertificateDetailsCard } from "@/components/certificate/public-cards"
 import Link from "next/link"
 
@@ -27,24 +28,74 @@ async function CertificadoContent({ id }: { id: string }) {
     notFound()
   }
 
-  const certificado = result.data
-  const linkPublico = `http://localhost:3000/certificado/${certificado.hash_verificacao}`
+  const certificado = result.data as any
+  const baseUrl = process.env.URL_BASE ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://saber365.app"
+  const linkPublico = `${baseUrl}/certificado/${certificado.hash_verificacao}`
 
     // Avatar do aluno
   let avatarUrl: string | undefined = undefined
+  let socialLinks: Record<string,string> = {}
   try {
     const supabase = createServerSupabaseClient()
     const { data: aluno } = await supabase
       .from("users")
-      .select("url_foto")
+      .select("url_foto, social_links")
       .eq("uid", user.uid)
       .single()
     if (aluno?.url_foto) {
       avatarUrl = aluno.url_foto.startsWith("http") ? aluno.url_foto : `/api/avatar/${encodeURIComponent(aluno.url_foto.replace(/^ead\//, ""))}`
+    socialLinks = aluno.social_links ?? {}
     }
   } catch (e) {
     // ignore
   }
+
+  // Extrair ano e mês de emissão para LinkedIn
+  const emitidoDate = certificado.emitido_em ? new Date(certificado.emitido_em) : undefined
+  const issueYear = emitidoDate ? emitidoDate.getUTCFullYear() : ""
+  const issueMonth = emitidoDate ? emitidoDate.getUTCMonth() + 1 : "" // getUTCMonth retorna 0-11
+
+  const linkedInUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(certificado.titulo_curso)}&organizationName=Saber365&issueYear=${issueYear}&issueMonth=${issueMonth}&expirationYear=&expirationMonth=&certUrl=${encodeURIComponent(linkPublico)}&certId=${certificado.numero_certificado}&organizationId=107917361`
+
+  // ---- Buscar módulos e aulas do curso para verso ----
+  let modulesInfo: { id: string; titulo: string; aulas: { id: string; titulo: string; duracao?: number }[] }[] = []
+  let modulesCount = 0
+  let aulasCount = 0
+  let totalMinutes = 0
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data: modulos } = await supabase
+      .from("modulos")
+      .select("id, titulo, ordem")
+      .eq("curso_id", certificado.curso_id)
+      .eq("ativo", true)
+      .order("ordem")
+
+    if (modulos) {
+      modulesCount = modulos.length
+      const moduloIds = modulos.map((m: any) => m.id)
+      const { data: aulas } = await supabase
+        .from("aulas")
+        .select("id, modulo_id, titulo, duracao")
+        .in("modulo_id", moduloIds)
+        .eq("ativo", true)
+
+      const aulaMap: Record<string, any[]> = {}
+      if (aulas) {
+        aulasCount = aulas.length
+        aulas.forEach((a: any) => {
+          totalMinutes += a.duracao ?? 0
+          if (!aulaMap[a.modulo_id]) aulaMap[a.modulo_id] = []
+          aulaMap[a.modulo_id].push({ id: a.id, titulo: a.titulo, duracao: a.duracao })
+        })
+      }
+
+      modulesInfo = modulos.map((m: any) => ({ id: m.id, titulo: m.titulo, aulas: aulaMap[m.id] ?? [] }))
+    }
+  } catch (e) {
+    // ignore erros de fetch
+  }
+  const durationString = `${totalMinutes} minutos`
 
   const issueDateFormatted = certificado.emitido_em
     ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(certificado.emitido_em))
@@ -97,12 +148,16 @@ async function CertificadoContent({ id }: { id: string }) {
                 issueDate={issueDateFormatted}
                 validity={"Não expira"}
                 hashAuth={certificado.hash_verificacao}
-                qrUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/certificado/${certificado.hash_verificacao}`)}`}
-                modulesInfo={[]}
-                modulesCount={0}
-                aulasCount={0}
-                duration={`${certificado.carga_horaria ?? 0}h`}
+                qrUrl={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${baseUrl}/certificado/${certificado.hash_verificacao}`)}`}
+                modulesInfo={modulesInfo}
+                modulesCount={modulesCount}
+                aulasCount={aulasCount}
+                duration={durationString}
                 avatarUrl={avatarUrl}
+                links={socialLinks}
+                visibility={certificado.social_visibility ?? {}}
+                editable
+                certId={certificado.id}
               />
               <div className="mt-6 flex justify-end">
                 <Button asChild variant="outline" className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600">
@@ -128,6 +183,7 @@ async function CertificadoContent({ id }: { id: string }) {
               </div>
             </div>
 
+            <CertificadoActions linkPublico={linkPublico} linkedInUrl={linkedInUrl} />
             <CertificateDetailsCard certificado={certificado} transparentBg />
           </div>
         </div>

@@ -68,7 +68,9 @@ export async function buscarCertificadoPorId(certificadoId: string, userId: stri
         status,
         emitido_em,
         hash_verificacao,
-        aluno_id
+        curso_id,
+        aluno_id,
+        social_visibility
       `)
       .eq("id", certificadoId)
       .eq("aluno_id", userId) // Garantir que só o dono pode ver

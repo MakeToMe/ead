@@ -8,6 +8,7 @@ export interface User {
   email: string
   criado_em: string
   atualizado_em?: string
+  url_foto?: string
 }
 
 /**************** Session helpers via secure cookies ****************/

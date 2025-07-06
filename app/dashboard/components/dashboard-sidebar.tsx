@@ -19,7 +19,7 @@ import {
   Settings,
   Award,
 } from "lucide-react"
-import { destroyClientSession, type User as AuthUser } from "@/lib/auth-client"
+import { destroyClientSession, ensureUserLoaded, type User as AuthUser } from "@/lib/auth-client"
 import { useMobile } from "@/hooks/use-mobile"
 import { getUserFresh, getSignedPhotoUrl } from "./sidebar-actions"
 
@@ -97,7 +97,7 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
     }
   }, [pathname, user?.email])
 
-  // Adicionar listener para evento customizado de atualização
+  // Adicionar listener para eventos customizados de atualização de perfil e sessão
   useEffect(() => {
     const handleProfileUpdate = async () => {
       if (user?.email) {
@@ -115,7 +115,34 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
     }
 
     window.addEventListener("profileUpdated", handleProfileUpdate)
-    return () => window.removeEventListener("profileUpdated", handleProfileUpdate)
+      const handleAuthChanged = async () => {
+        const current = await ensureUserLoaded()
+        if (!current) {
+          // Sem sessão -> limpar e voltar à home
+          setUser({} as AuthUser)
+          setPhotoUrl(null)
+          return
+        }
+        const latest = current
+        if (latest) {
+          setUser(latest)
+          if (latest.url_foto) {
+            const signedUrl = await getSignedPhotoUrl(latest.url_foto)
+            setPhotoUrl(signedUrl)
+          } else {
+            setPhotoUrl(null)
+          }
+        } else {
+          // Sem sessão => limpar user
+          setUser({} as AuthUser)
+          setPhotoUrl(null)
+        }
+      }
+      window.addEventListener("auth-changed", handleAuthChanged)
+    return () => {
+      window.removeEventListener("profileUpdated", handleProfileUpdate)
+      window.removeEventListener("auth-changed", handleAuthChanged)
+    }
   }, [user?.email])
 
   // Auto-collapse em telas pequenas, mas respeita escolha manual em desktop

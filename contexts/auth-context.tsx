@@ -22,10 +22,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Carrega/garante usuário de forma assíncrona via cookie
-    ensureUserLoaded().then((u) => {
-      setUser(u)
-      setIsLoading(false)
-    })
+    let mounted = true
+    const load = async () => {
+      const u = await ensureUserLoaded()
+      if (mounted) {
+        setUser(u)
+        setIsLoading(false)
+      }
+    }
+    load()
+
+    // Ouvir eventos de mudança de autenticação vindos de auth-client
+    const handler = async () => {
+      const u = await ensureUserLoaded()
+      if (mounted) {
+        setUser(u)
+      }
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("auth-changed", handler)
+    }
+    return () => {
+      mounted = false
+      if (typeof window !== "undefined") {
+        window.removeEventListener("auth-changed", handler)
+      }
+    }
   }, [])
 
   return (

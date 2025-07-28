@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, Settings, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -32,18 +32,303 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
   const [videoInfo, setVideoInfo] = useState<string>("")
   const [aspectRatio, setAspectRatio] = useState<number | null>(null)
 
+  // Performance states
+  const [isBuffering, setIsBuffering] = useState(false)
+  const [networkSpeed, setNetworkSpeed] = useState<'slow' | 'normal' | 'fast'>('normal')
+  const [bufferedRanges, setBufferedRanges] = useState<TimeRanges | null>(null)
+  const [preloadProgress, setPreloadProgress] = useState(0)
+  const [isPreloading, setIsPreloading] = useState(false)
+
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const loadStartTime = useRef<number>(0)
+  const preloadIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const aggressivePreloadRef = useRef<HTMLVideoElement | null>(null)
+
+  // Detectar velocidade da rede
+  const detectNetworkSpeed = useCallback(async () => {
+    if (!src) return 'normal'
+
+    const startTime = performance.now()
+
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000)
+
+      const response = await fetch(src, {
+        method: 'HEAD',
+        cache: 'no-cache',
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+      const endTime = performance.now()
+      const responseTime = endTime - startTime
+
+      if (response.ok) {
+        if (responseTime < 200) return 'fast'
+        if (responseTime < 800) return 'normal'
+        return 'slow'
+      }
+
+      return 'slow'
+    } catch (error) {
+      return 'slow'
+    }
+  }, [src])
+
+  // Seek otimizado com debounce
+  const debouncedSeek = useMemo(() => {
+    let timeout: NodeJS.Timeout | null = null
+
+    return (value: number[]) => {
+      if (timeout) clearTimeout(timeout)
+
+      // Atualizar UI imediatamente
+      const newTime = (value[0] / 100) * duration
+      setCurrentTime(newTime)
+
+      // Aplicar seek com debounce
+      timeout = setTimeout(() => {
+        const video = videoRef.current
+        if (!video) return
+
+        const seekStartTime = performance.now()
+        video.currentTime = newTime
+
+        // Medir performance do seek
+        const handleSeeked = () => {
+          const seekTime = performance.now() - seekStartTime
+          console.debug('Seek completed in:', seekTime, 'ms')
+          video.removeEventListener('seeked', handleSeeked)
+        }
+
+        video.addEventListener('seeked', handleSeeked)
+      }, 150)
+    }
+  }, [duration])
+
+  // Sistema de preload híbrido ultra otimizado
+  const startAggressivePreload = useCallback(() => {
+    const video = videoRef.current
+    if (!video || !duration || isPreloading) return
+
+    setIsPreloading(true)
+    console.log('🚀 Iniciando sistema de preload HÍBRIDO ultra otimizado...')
+
+    // Estratégia 1: Configurar vídeo principal para máximo preload
+    video.preload = 'auto'
+    video.setAttribute('preload', 'auto')
+
+    // Estratégia 2: Múltiplos elementos de vídeo para preload paralelo
+    const preloadVideos: HTMLVideoElement[] = []
+    const segments = 8 // Otimizado para 8 segmentos paralelos
+
+    const createPreloadElement = (index: number) => {
+      const preloadVideo = document.createElement('video')
+      preloadVideo.src = src
+      preloadVideo.preload = 'auto'
+      preloadVideo.muted = true
+      preloadVideo.volume = 0
+      preloadVideo.style.cssText = `
+        position: absolute !important;
+        top: -9999px !important;
+        left: -9999px !important;
+        width: 1px !important;
+        height: 1px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        z-index: -9999 !important;
+      `
+
+      // Configurações para máximo preload
+      preloadVideo.setAttribute('preload', 'auto')
+      preloadVideo.setAttribute('crossorigin', 'anonymous')
+
+      document.body.appendChild(preloadVideo)
+      return preloadVideo
+    }
+
+    // Estratégia 3: Range requests simulados através de seeks inteligentes
+    const forceCompleteDownload = async () => {
+      try {
+        console.log('🔄 Iniciando download paralelo em segmentos...')
+
+        // Criar elementos de preload
+        for (let i = 0; i < segments; i++) {
+          const preloadVideo = createPreloadElement(i)
+          preloadVideos.push(preloadVideo)
+        }
+
+        // Aguardar um pouco para os elementos carregarem
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Processar segmentos em paralelo
+        const segmentPromises = preloadVideos.map(async (preloadVideo, index) => {
+          try {
+            // Aguardar metadados
+            await new Promise((resolve) => {
+              if (preloadVideo.readyState >= 1) {
+                resolve(true)
+              } else {
+                preloadVideo.addEventListener('loadedmetadata', () => resolve(true), { once: true })
+                // Timeout de segurança
+                setTimeout(() => resolve(true), 3000)
+              }
+            })
+
+            const segmentDuration = duration / segments
+            const segmentStart = index * segmentDuration
+            const segmentEnd = Math.min((index + 1) * segmentDuration, duration)
+
+            console.log(`📥 Processando segmento ${index + 1}/${segments}: ${segmentStart.toFixed(1)}s - ${segmentEnd.toFixed(1)}s`)
+
+            // Fazer seeks MUITO densos no segmento para forçar download completo
+            const seekInterval = 2 // A cada 2 segundos (mais agressivo)
+            for (let seekTime = segmentStart; seekTime < segmentEnd; seekTime += seekInterval) {
+              preloadVideo.currentTime = Math.min(seekTime, duration - 0.1)
+
+              // Aguardar seek ser processado com timeout menor
+              await new Promise(resolve => {
+                const onSeeked = () => {
+                  preloadVideo.removeEventListener('seeked', onSeeked)
+                  resolve(true)
+                }
+                preloadVideo.addEventListener('seeked', onSeeked)
+                setTimeout(() => {
+                  preloadVideo.removeEventListener('seeked', onSeeked)
+                  resolve(true)
+                }, 200) // Reduzir timeout
+              })
+
+              // Pausa menor para ser mais agressivo
+              await new Promise(resolve => setTimeout(resolve, 30))
+            }
+
+            // Estratégia adicional: Fazer seeks reversos para garantir download completo
+            for (let seekTime = segmentEnd - seekInterval; seekTime >= segmentStart; seekTime -= seekInterval) {
+              preloadVideo.currentTime = Math.max(seekTime, 0)
+              await new Promise(resolve => setTimeout(resolve, 30))
+            }
+
+            console.log(`✅ Segmento ${index + 1} concluído`)
+            return true
+
+          } catch (error) {
+            console.warn(`❌ Erro no segmento ${index + 1}:`, error)
+            return false
+          }
+        })
+
+        // Aguardar todos os segmentos
+        const results = await Promise.allSettled(segmentPromises)
+        const successCount = results.filter(r => r.status === 'fulfilled').length
+
+        console.log(`📊 Preload concluído: ${successCount}/${segments} segmentos processados`)
+
+        // Atualizar progresso final
+        setPreloadProgress(100)
+        setIsPreloading(false)
+
+        // Manter elementos por mais tempo para cache
+        setTimeout(() => {
+          preloadVideos.forEach(video => {
+            if (video.parentNode) {
+              document.body.removeChild(video)
+            }
+          })
+          console.log('🧹 Cache de preload limpo')
+        }, 180000) // 3 minutos
+
+      } catch (error) {
+        console.error('❌ Erro crítico no preload:', error)
+        setIsPreloading(false)
+
+        // Limpar elementos em caso de erro
+        preloadVideos.forEach(video => {
+          if (video.parentNode) {
+            document.body.removeChild(video)
+          }
+        })
+      }
+    }
+
+    // Estratégia 4: Iniciar após delay otimizado
+    setTimeout(forceCompleteDownload, 800)
+
+  }, [src, duration, isPreloading])
+
+  // Monitorar buffer
+  const updateBufferInfo = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    setBufferedRanges(video.buffered)
+
+    // Detectar buffering
+    const currentTime = video.currentTime
+    const buffered = video.buffered
+    let bufferAhead = 0
+    let totalBuffered = 0
+
+    // Calcular total buffered
+    for (let i = 0; i < buffered.length; i++) {
+      totalBuffered += buffered.end(i) - buffered.start(i)
+
+      if (buffered.start(i) <= currentTime && buffered.end(i) > currentTime) {
+        bufferAhead = buffered.end(i) - currentTime
+      }
+    }
+
+    // Calcular porcentagem do vídeo já carregada
+    const bufferPercentage = duration > 0 ? (totalBuffered / duration) * 100 : 0
+
+    const isCurrentlyBuffering = bufferAhead < 2 && !video.paused && !video.ended
+    setIsBuffering(isCurrentlyBuffering)
+
+    // Se menos de 80% está carregado e não estamos fazendo preload, iniciar preload agressivo
+    if (bufferPercentage < 80 && !isPreloading && duration > 0) {
+      startAggressivePreload()
+    }
+
+    console.debug('Buffer info:', {
+      bufferAhead: Math.round(bufferAhead),
+      totalBuffered: Math.round(totalBuffered),
+      bufferPercentage: Math.round(bufferPercentage),
+      isBuffering: isCurrentlyBuffering
+    })
+  }, [duration, isPreloading, startAggressivePreload])
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     // Log da URL para debug
-    // console.log("Tentando carregar vídeo:", src)
-    setVideoInfo(`URL: ${src}`)
+    console.log("Tentando carregar vídeo:", src)
+    setVideoInfo("")
+
+    // Detectar velocidade da rede e otimizar preload
+    detectNetworkSpeed().then(speed => {
+      setNetworkSpeed(speed)
+
+      // Otimizar preload baseado na velocidade
+      switch (speed) {
+        case 'slow':
+          video.preload = 'metadata'
+          break
+        case 'normal':
+          video.preload = 'auto'
+          break
+        case 'fast':
+          video.preload = 'auto'
+          break
+      }
+
+      console.debug('Network speed detected:', speed, 'preload:', video.preload)
+    })
 
     const handleLoadStart = () => {
-      // console.log("Iniciando carregamento do vídeo")
+      loadStartTime.current = performance.now()
       setIsLoading(true)
       setError(null)
     }
@@ -62,6 +347,11 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
       if (video.videoWidth && video.videoHeight) {
         setAspectRatio(video.videoWidth / video.videoHeight)
       }
+
+      // Iniciar preload agressivo imediatamente após metadados carregarem
+      setTimeout(() => {
+        startAggressivePreload()
+      }, 500) // Reduzir para 500ms para iniciar mais cedo
     }
 
     const handleCanPlay = () => {
@@ -132,6 +422,7 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
     video.addEventListener("error", handleError)
     video.addEventListener("waiting", handleWaiting)
     video.addEventListener("playing", handlePlaying)
+    video.addEventListener("progress", updateBufferInfo)
 
     return () => {
       video.removeEventListener("loadstart", handleLoadStart)
@@ -142,8 +433,9 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
       video.removeEventListener("error", handleError)
       video.removeEventListener("waiting", handleWaiting)
       video.removeEventListener("playing", handlePlaying)
+      video.removeEventListener("progress", updateBufferInfo)
     }
-  }, [src, onProgress, onEnded])
+  }, [src, onProgress, onEnded, detectNetworkSpeed, updateBufferInfo])
 
   // Monitorar mudanças no estado de fullscreen
   useEffect(() => {
@@ -184,14 +476,7 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
     }
   }
 
-  const handleSeek = (value: number[]) => {
-    const video = videoRef.current
-    if (!video) return
-
-    const newTime = (value[0] / 100) * duration
-    video.currentTime = newTime
-    setCurrentTime(newTime)
-  }
+  const handleSeek = debouncedSeek
 
   const handleVolumeChange = (value: number[]) => {
     const video = videoRef.current
@@ -292,7 +577,7 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-400" />
           <h3 className="text-lg font-semibold text-white mb-2">URL de vídeo inválida</h3>
           <p className="text-slate-400 mb-4">A URL do vídeo não é válida ou está vazia.</p>
-          <div className="text-xs text-slate-500 bg-slate-700/50 p-2 rounded">URL: {src || "Não fornecida"}</div>
+          <div className="text-xs text-slate-500 bg-slate-700/50 p-2 rounded">Verifique se o vídeo está disponível</div>
         </CardContent>
       </Card>
     )
@@ -311,8 +596,7 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
               Tentar Novamente
             </Button>
             <div className="text-xs text-slate-500 bg-slate-700/50 p-2 rounded">
-              <div>URL: {src}</div>
-              <div className="mt-1">{videoInfo}</div>
+              <div>Erro técnico detectado. Verifique sua conexão.</div>
             </div>
           </div>
         </CardContent>
@@ -336,7 +620,6 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
           <div className="text-center text-slate-400">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400 mx-auto mb-4"></div>
             <p>Carregando vídeo...</p>
-            <div className="text-xs mt-2 opacity-70">{videoInfo}</div>
           </div>
         </div>
       )}

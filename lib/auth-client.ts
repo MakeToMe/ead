@@ -8,6 +8,7 @@ export interface User {
   email: string
   criado_em: string
   atualizado_em?: string
+  url_foto?: string
 }
 
 /**************** Session helpers via secure cookies ****************/
@@ -45,8 +46,22 @@ export async function getCurrentClientUserAsync(): Promise<User | null> {
   return ensureUserLoaded()
 }
 
+// Força refetch da API ignorando cache atual
+export async function refreshUser(): Promise<User | null> {
+  cachedUser = await fetchUser()
+  // Avisar mudança
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("auth-changed"))
+  }
+  return cachedUser
+}
+
 export function clearCachedUser() {
   cachedUser = null
+  // Notificar listeners de que o usuário mudou
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("auth-changed"))
+  }
 }
 
 export async function clientSignOut(): Promise<void> {
@@ -71,6 +86,9 @@ async function postJson<T>(url: string, body: Record<string, unknown>): Promise<
 export async function clientSignIn(email: string, password: string): Promise<User> {
   const { user } = await postJson<{ user: User }>("/api/auth/signin", { email, password })
   cachedUser = user
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("auth-changed"))
+  }
   return user
 }
 

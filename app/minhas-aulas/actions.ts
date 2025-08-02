@@ -445,27 +445,49 @@ export async function excluirArquivoMinio(url: string): Promise<{ success: boole
       return { success: true, message: "Nenhum arquivo para excluir" }
     }
 
-    console.log("🗑️ Excluindo arquivo do MinIO:", url)
+    console.log("🗑️ Excluindo arquivo do MinIO (estrutura compatível):", url.replace(/\/[^\/]+$/, '/***'))
 
-    // Extrair o caminho do arquivo da URL
-    // URL exemplo: https://avs3.guardia.work/rar/videos/arquivo.mp4
-    const urlParts = url.split("/")
-    const bucket = urlParts[urlParts.length - 2] // 'rar'
-    const fileName = urlParts[urlParts.length - 1] // 'arquivo.mp4'
-    const folder = urlParts[urlParts.length - 3] // 'videos' ou 'files' ou 'imagens'
+    // Importar funções de detecção e parsing
+    const { detectStructureType, parseMinioUrl, getMinioConfig, getMinioUploadUrl, getMinioUserUploadUrl } = await import("@/lib/minio-config")
+    const { MinioFileType } = await import("@/lib/minio-config")
+    
+    // Detectar tipo de estrutura
+    const structureType = detectStructureType(url)
+    const parsedUrl = parseMinioUrl(url)
+    
+    console.log("🔍 Estrutura detectada:", structureType, parsedUrl.structure)
 
-    const filePath = `${folder}/${fileName}`
+    let deleteUrl: string
 
-    // Credenciais MinIO
-    const minioConfig = {
-      endpoint: "https://avs3.guardia.work",
-      bucket: "rar",
+    if (structureType === 'new' && parsedUrl.userId && parsedUrl.tipo && parsedUrl.fileName) {
+      // Nova estrutura: usar função específica para usuário
+      const tipoMap: Record<string, MinioFileType> = {
+        'videos': 'video',
+        'documentos': 'file', 
+        'imagens': 'imagem'
+      }
+      const minioFileType = tipoMap[parsedUrl.tipo] as MinioFileType
+      deleteUrl = getMinioUserUploadUrl(parsedUrl.userId, minioFileType, parsedUrl.fileName)
+      
+      console.log("🗑️ Excluindo com nova estrutura:", {
+        userId: parsedUrl.userId,
+        tipo: parsedUrl.tipo,
+        structure: 'new'
+      })
+    } else {
+      // Estrutura antiga: usar método original
+      const urlParts = url.split("/")
+      const fileName = urlParts[urlParts.length - 1]
+      const folder = urlParts[urlParts.length - 2]
+      const filePath = `${folder}/${fileName}`
+      
+      deleteUrl = getMinioUploadUrl(filePath)
+      
+      console.log("🗑️ Excluindo com estrutura antiga:", {
+        folder: folder,
+        structure: 'old'
+      })
     }
-
-    // URL para exclusão
-    const deleteUrl = `${minioConfig.endpoint}/${minioConfig.bucket}/${filePath}`
-
-    console.log("🗑️ Tentando excluir:", deleteUrl)
 
     const response = await fetch(deleteUrl, {
       method: "DELETE",
@@ -476,7 +498,10 @@ export async function excluirArquivoMinio(url: string): Promise<{ success: boole
 
     // MinIO retorna 204 para exclusão bem-sucedida ou 404 se arquivo não existe
     if (response.ok || response.status === 404) {
-      console.log("✅ Arquivo excluído do MinIO:", filePath)
+      console.log("✅ Arquivo excluído do MinIO:", {
+        structure: structureType,
+        success: true
+      })
       return { success: true, message: "Arquivo excluído com sucesso" }
     } else {
       console.error("❌ Erro ao excluir arquivo:", response.status, response.statusText)
@@ -495,48 +520,30 @@ export async function uploadArquivoMinio(
   tipo: "video" | "file" | "imagem",
 ): Promise<{ success: boolean; url?: string; message?: string }> {
   try {
-    console.log(`🚀 UPLOAD DIRETO MINIO - Iniciando upload de ${tipo}:`, {
+    console.log(`🚀 UPLOAD NOVA ESTRUTURA MINIO - Iniciando upload de ${tipo}:`, {
       fileName: file.name,
       fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
       fileType: file.type,
       userId: userId,
+      newStructure: true,
     })
 
-    // Gerar nome único com estrutura: uid_do_user-timestamp-nome.ext
+    // Gerar nome único SEM UID (já está na estrutura da pasta)
     const timestamp = Date.now()
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-    const fileName = `${userId}-${timestamp}-${cleanFileName}`
+    const fileName = `${timestamp}-${cleanFileName}`
 
-    // Definir pasta baseada no tipo
-    let pasta: string
-    switch (tipo) {
-      case "video":
-        pasta = "videos"
-        break
-      case "file":
-        pasta = "files"
-        break
-      case "imagem":
-        pasta = "imagens"
-        break
-      default:
-        pasta = "files"
-    }
+    // Importar funções da nova estrutura
+    const { getMinioUserUploadUrl, getMinioUserFileUrl } = await import("@/lib/minio-config")
+    const { MinioFileType } = await import("@/lib/minio-config")
 
-    const filePath = `${pasta}/${fileName}`
+    // Usar nova estrutura baseada em UID: rarcursos/[uid]/[tipo]/[arquivo]
+    const uploadUrl = getMinioUserUploadUrl(userId, tipo as MinioFileType, fileName)
 
-    // Credenciais Minio (hardcoded para desenvolvimento)
-    const minioConfig = {
-      endpoint: "https://avs3.guardia.work",
-      bucket: "rar",
-      accessKey: "Lk8turm95ZgogNg17TpO",
-      secretKey: "z8LKHzi1wXUPa6uyRTdW8CvlMYsIVINW8SytZ8ob",
-    }
-
-    // URL completa para upload direto
-    const uploadUrl = `${minioConfig.endpoint}/${minioConfig.bucket}/${filePath}`
-
-    console.log("📤 Fazendo upload direto para MinIO:", uploadUrl)
+    console.log("📤 Fazendo upload com nova estrutura para MinIO:", {
+      structure: `${userId}/${tipo === 'file' ? 'documentos' : tipo === 'video' ? 'videos' : 'imagens'}/${fileName}`,
+      uploadUrl: uploadUrl.replace(/\/[^\/]+$/, '/***') // Ocultar nome do arquivo no log
+    })
 
     const response = await fetch(uploadUrl, {
       method: "PUT",
@@ -552,10 +559,13 @@ export async function uploadArquivoMinio(
       throw new Error(`Upload failed: ${response.statusText}`)
     }
 
-    // URL final do arquivo
-    const fileUrl = `https://avs3.guardia.work/rar/${filePath}`
+    // URL final do arquivo com nova estrutura
+    const fileUrl = getMinioUserFileUrl(userId, tipo as MinioFileType, fileName)
 
-    console.log("✅ Upload direto bem-sucedido:", fileUrl)
+    console.log("✅ Upload com nova estrutura bem-sucedido:", {
+      structure: `${userId}/${tipo === 'file' ? 'documentos' : tipo === 'video' ? 'videos' : 'imagens'}/`,
+      success: true
+    })
 
     return {
       success: true,
@@ -563,7 +573,7 @@ export async function uploadArquivoMinio(
       message: "Arquivo enviado com sucesso",
     }
   } catch (error) {
-    console.error("💥 Erro no upload direto:", error)
+    console.error("💥 Erro no upload com nova estrutura:", error)
     return {
       success: false,
       message: "Erro ao enviar arquivo. Tente novamente.",

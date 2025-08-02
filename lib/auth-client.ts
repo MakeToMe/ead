@@ -84,5 +84,15 @@ export async function clientSignUp(name: string, email: string, password: string
 // Alguns componentes legados ainda importam `destroyClientSession`.
 // Mantemos um alias para evitar erros de build enquanto não refatoramos todos.
 export function destroyClientSession() {
+  console.log('🧹 destroyClientSession: Limpando sessão do cliente')
   clearCachedUser()
+  
+  // Também limpar UserStateManager se disponível
+  if (typeof window !== 'undefined') {
+    import("@/lib/user-state-manager").then(({ default: userStateManager }) => {
+      userStateManager.clearAll()
+    }).catch(() => {
+      // Ignorar erro se não conseguir importar
+    })
+  }
 }

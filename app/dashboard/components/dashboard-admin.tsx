@@ -7,8 +7,21 @@ import { RefreshCw, BookOpen, GraduationCap, Users } from "lucide-react"
 import { getAdminStats } from "../admin-actions"
 import { GridAlunos } from "./grid-alunos"
 import { getSignedPhotoUrl } from "./sidebar-actions"
-import type { User } from "@/lib/auth-client"
+import type { User } from "@/lib/auth-service"
 import { getUserFresh } from "./sidebar-actions"
+
+// URL da imagem padrão - será carregada dinamicamente
+let DEFAULT_IMAGE_URL = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+
+// Função para carregar a URL padrão dinamicamente
+async function loadDefaultImageUrl() {
+  try {
+    const { getDefaultImageUrlClient } = await import("@/lib/minio-config")
+    DEFAULT_IMAGE_URL = getDefaultImageUrlClient()
+  } catch (error) {
+    console.error("Erro ao carregar URL padrão:", error)
+  }
+}
 
 interface DashboardAdminProps {
   user: User
@@ -103,7 +116,8 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
     if (userPhotoUrl) {
       return userPhotoUrl
     }
-    return "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+    loadDefaultImageUrl()
+    return DEFAULT_IMAGE_URL
   }
 
   return (
@@ -143,7 +157,7 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
                           alt="Foto do instrutor"
                           className="w-24 h-32 object-cover rounded-xl"
                           onError={(e) => {
-                            e.currentTarget.src = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+                            e.currentTarget.src = DEFAULT_IMAGE_URL
                           }}
                         />
                       )}
@@ -174,7 +188,7 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
                           alt="Foto do instrutor"
                           className="w-32 h-44 md:w-36 md:h-48 object-cover rounded-xl"
                           onError={(e) => {
-                            e.currentTarget.src = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+                            e.currentTarget.src = DEFAULT_IMAGE_URL
                           }}
                         />
                       )}

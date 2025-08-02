@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getCurrentClientUser, type User } from "@/lib/auth-client"
+import { useAuth } from "@/contexts/auth-context"
+import type { User } from "@/lib/auth-service"
 import { getUserFreshData, getDashboardStats, marcarAtividadesComoVisualizadas } from "./actions"
 import { DashboardAdmin } from "./components/dashboard-admin"
 import { useMobile } from "@/hooks/use-mobile"
@@ -9,6 +10,19 @@ import { motion } from "framer-motion"
 import { RefreshCw, Play, CheckCircle, Award, BookOpen, Clock, Calendar, Bug } from "lucide-react"
 import Link from "next/link"
 import { getSignedPhotoUrl } from "./components/sidebar-actions"
+
+// URL da imagem padrão - será carregada dinamicamente
+let DEFAULT_IMAGE_URL = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+
+// Função para carregar a URL padrão dinamicamente
+async function loadDefaultImageUrl() {
+  try {
+    const { getDefaultImageUrlClient } = await import("@/lib/minio-config")
+    DEFAULT_IMAGE_URL = getDefaultImageUrlClient()
+  } catch (error) {
+    console.error("Erro ao carregar URL padrão:", error)
+  }
+}
 
 // Tipos para atividades recentes
 interface Atividade {
@@ -177,9 +191,10 @@ function DashboardAluno({ user }: { user: User }) {
       return userPhotoUrl
     }
 
-    // Caso contrário, usar a foto hardcoded
-    // console.debug("📷 Usando foto padrão hardcoded")
-    return "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+    // Caso contrário, usar a foto padrão
+    // console.debug("📷 Usando foto padrão")
+    loadDefaultImageUrl() // Carrega assincronamente, mas não bloqueia
+    return DEFAULT_IMAGE_URL
   }
 
   return (
@@ -228,7 +243,7 @@ function DashboardAluno({ user }: { user: User }) {
                           className="w-24 h-32 object-cover rounded-xl"
                           onError={(e) => {
                             // console.debug("❌ Erro ao carregar imagem, usando fallback")
-                            e.currentTarget.src = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+                            e.currentTarget.src = DEFAULT_IMAGE_URL
                           }}
                           onLoad={() => {
                             // console.debug("✅ Imagem carregada com sucesso no hero")
@@ -263,7 +278,7 @@ function DashboardAluno({ user }: { user: User }) {
                           className="w-32 h-44 md:w-36 md:h-48 object-cover rounded-xl"
                           onError={(e) => {
                             // console.debug("❌ Erro ao carregar imagem, usando fallback")
-                            e.currentTarget.src = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
+                            e.currentTarget.src = DEFAULT_IMAGE_URL
                           }}
                           onLoad={() => {
                             // console.debug("✅ Imagem carregada com sucesso no hero")
@@ -381,17 +396,16 @@ function DashboardAluno({ user }: { user: User }) {
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, isLoading } = useAuth()
 
-  useEffect(() => {
-    const currentUser = getCurrentClientUser()
-    // console.debug("Usuário atual no dashboard:", currentUser)
-    setUser(currentUser)
-    setLoading(false)
-  }, [])
+  console.log('🎯 DashboardPage: Dados do usuário', {
+    userId: user?.uid,
+    nome: user?.nome,
+    perfil: user?.perfis,
+    isLoading
+  })
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-4 md:p-8 flex items-center justify-center min-h-screen">
         <div className="text-center">

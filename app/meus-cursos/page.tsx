@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { getCurrentClientUser, type User } from "@/lib/auth-client"
+import { useAuth } from "@/contexts/auth-context"
+import type { User } from "@/lib/auth-service"
 import { motion } from "framer-motion"
 import { PlusCircle, BookOpen } from "lucide-react"
 import ModalAdicionarCurso from "./components/modal-adicionar-curso"
@@ -26,8 +27,7 @@ interface Curso {
 const ITENS_POR_PAGINA = 6
 
 export default function MeusCursosPage() {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, isLoading: authLoading, hasRole } = useAuth()
   const [cursos, setCursos] = useState<Curso[]>([])
   const [loadingCursos, setLoadingCursos] = useState(false)
   const [paginaAtual, setPaginaAtual] = useState(1)
@@ -36,25 +36,26 @@ export default function MeusCursosPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const currentUser = getCurrentClientUser()
+    // Aguardar carregamento da autenticação
+    if (authLoading) return
 
-    if (!currentUser) {
+    if (!user) {
+      console.log('🚪 MeusCursosPage: Usuário não autenticado, redirecionando')
       router.push("/")
       return
     }
 
     // Verificar se o usuário tem permissão para criar cursos
-    if (currentUser.perfis !== "instrutor" && currentUser.perfis !== "admin") {
+    if (!hasRole("instrutor") && !hasRole("admin")) {
+      console.log('⚠️ MeusCursosPage: Usuário sem permissão, redirecionando para dashboard')
       router.push("/dashboard")
       return
     }
 
-    setUser(currentUser)
-    setLoading(false)
-
+    console.log('✅ MeusCursosPage: Usuário autorizado, carregando cursos')
     // Carregar cursos do instrutor
-    carregarCursos(currentUser.uid, paginaAtual)
-  }, [router, paginaAtual])
+    carregarCursos(user.uid, paginaAtual)
+  }, [user, authLoading, hasRole, router, paginaAtual])
 
   const carregarCursos = async (instrutorId: string, pagina: number) => {
     setLoadingCursos(true)
@@ -133,7 +134,8 @@ export default function MeusCursosPage() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
   }
 
-  if (loading) {
+  // Loading states
+  if (authLoading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
         <div className="text-center">
@@ -144,7 +146,8 @@ export default function MeusCursosPage() {
     )
   }
 
-  if (!user) {
+  // Se não há usuário ou não tem permissão, não renderizar nada (redirecionamento em andamento)
+  if (!user || (!hasRole("instrutor") && !hasRole("admin"))) {
     return null
   }
 

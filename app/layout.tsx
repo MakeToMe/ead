@@ -4,7 +4,10 @@ import { Inter } from "next/font/google"
 import { AuthProvider } from "@/contexts/auth-context"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Toaster } from "@/components/ui/toaster"
+import DebugLoader from "@/components/debug-loader"
 import "./globals.css"
+
+
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -52,6 +55,7 @@ export default function RootLayout({
         <AuthProvider>
           <DashboardLayout>{children}</DashboardLayout>
           <Toaster />
+          <DebugLoader />
         </AuthProvider>
       </body>
     </html>

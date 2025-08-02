@@ -38,9 +38,8 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
     const video = videoRef.current
     if (!video) return
 
-    // Log da URL para debug
-    // console.log("Tentando carregar vídeo:", src)
-    setVideoInfo(`URL: ${src}`)
+    // Inicializar informações do vídeo
+    setVideoInfo("Preparando reprodução...")
 
     const handleLoadStart = () => {
       // console.log("Iniciando carregamento do vídeo")
@@ -85,7 +84,6 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
         error: video.error,
         networkState: video.networkState,
         readyState: video.readyState,
-        src: video.src,
       })
 
       let errorMessage = "Erro desconhecido ao carregar o vídeo"
@@ -292,7 +290,7 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-400" />
           <h3 className="text-lg font-semibold text-white mb-2">URL de vídeo inválida</h3>
           <p className="text-slate-400 mb-4">A URL do vídeo não é válida ou está vazia.</p>
-          <div className="text-xs text-slate-500 bg-slate-700/50 p-2 rounded">URL: {src || "Não fornecida"}</div>
+          <div className="text-xs text-slate-500 bg-slate-700/50 p-2 rounded">Status: URL inválida ou não fornecida</div>
         </CardContent>
       </Card>
     )
@@ -311,8 +309,8 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
               Tentar Novamente
             </Button>
             <div className="text-xs text-slate-500 bg-slate-700/50 p-2 rounded">
-              <div>URL: {src}</div>
-              <div className="mt-1">{videoInfo}</div>
+              <div>Status: Erro ao carregar conteúdo</div>
+              <div className="mt-1">Tente recarregar ou entre em contato com o suporte</div>
             </div>
           </div>
         </CardContent>
@@ -336,7 +334,6 @@ export function VideoPlayer({ src, title, onProgress, onEnded }: VideoPlayerProp
           <div className="text-center text-slate-400">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400 mx-auto mb-4"></div>
             <p>Carregando vídeo...</p>
-            <div className="text-xs mt-2 opacity-70">{videoInfo}</div>
           </div>
         </div>
       )}

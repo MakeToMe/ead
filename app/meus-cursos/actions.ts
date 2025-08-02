@@ -131,24 +131,28 @@ export async function uploadImagemMinio(
   userId: string,
 ): Promise<{ success: boolean; url?: string; message?: string }> {
   try {
-    // Gerar nome único com estrutura: uid_do_user-timestamp-nome.ext
+    console.log("🚀 UPLOAD IMAGEM NOVA ESTRUTURA - Iniciando upload:", {
+      fileName: file.name,
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      userId: userId,
+      newStructure: true,
+    })
+
+    // Gerar nome único SEM UID (já está na estrutura da pasta)
     const timestamp = Date.now()
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-    const fileName = `${userId}-${timestamp}-${cleanFileName}`
-    const filePath = `imagens/${fileName}`
+    const fileName = `${timestamp}-${cleanFileName}`
 
-    // Credenciais Minio (hardcoded para desenvolvimento)
-    const minioConfig = {
-      endpoint: "https://avs3.guardia.work",
-      bucket: "rar",
-      accessKey: "Lk8turm95ZgogNg17TpO",
-      secretKey: "z8LKHzi1wXUPa6uyRTdW8CvlMYsIVINW8SytZ8ob",
-    }
+    // Importar funções da nova estrutura
+    const { getMinioUserUploadUrl, getMinioUserFileUrl } = await import("@/lib/minio-config")
 
-    // URL completa para upload
-    const uploadUrl = `${minioConfig.endpoint}/${minioConfig.bucket}/${filePath}`
+    // Usar nova estrutura baseada em UID: rarcursos/[uid]/imagens/[arquivo]
+    const uploadUrl = getMinioUserUploadUrl(userId, "imagem", fileName)
 
-    console.log("Fazendo upload para:", uploadUrl)
+    console.log("📤 Fazendo upload de imagem com nova estrutura:", {
+      structure: `${userId}/imagens/${fileName}`,
+      success: true
+    })
 
     const response = await fetch(uploadUrl, {
       method: "PUT",
@@ -164,10 +168,10 @@ export async function uploadImagemMinio(
       throw new Error(`Upload failed: ${response.statusText}`)
     }
 
-    // URL final da imagem
-    const imageUrl = `https://avs3.guardia.work/rar/${filePath}`
+    // URL final da imagem com nova estrutura
+    const imageUrl = getMinioUserFileUrl(userId, "imagem", fileName)
 
-    console.log("Upload bem-sucedido:", imageUrl)
+    console.log("✅ Upload de imagem com nova estrutura bem-sucedido")
 
     return {
       success: true,
@@ -183,30 +187,34 @@ export async function uploadImagemMinio(
   }
 }
 
-// Função para upload de vídeos (preparada para o futuro)
+// Função para upload de vídeos com nova estrutura
 export async function uploadVideoMinio(
   file: File,
   userId: string,
 ): Promise<{ success: boolean; url?: string; message?: string }> {
   try {
-    // Gerar nome único com estrutura: uid_do_user-timestamp-nome.ext
+    console.log("🚀 UPLOAD VÍDEO NOVA ESTRUTURA - Iniciando upload:", {
+      fileName: file.name,
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      userId: userId,
+      newStructure: true,
+    })
+
+    // Gerar nome único SEM UID (já está na estrutura da pasta)
     const timestamp = Date.now()
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-    const fileName = `${userId}-${timestamp}-${cleanFileName}`
-    const filePath = `videos/${fileName}`
+    const fileName = `${timestamp}-${cleanFileName}`
 
-    // Credenciais Minio (hardcoded para desenvolvimento)
-    const minioConfig = {
-      endpoint: "https://avs3.guardia.work",
-      bucket: "rar",
-      accessKey: "Lk8turm95ZgogNg17TpO",
-      secretKey: "z8LKHzi1wXUPa6uyRTdW8CvlMYsIVINW8SytZ8ob",
-    }
+    // Importar funções da nova estrutura
+    const { getMinioUserUploadUrl, getMinioUserFileUrl } = await import("@/lib/minio-config")
 
-    // URL completa para upload
-    const uploadUrl = `${minioConfig.endpoint}/${minioConfig.bucket}/${filePath}`
+    // Usar nova estrutura baseada em UID: rarcursos/[uid]/videos/[arquivo]
+    const uploadUrl = getMinioUserUploadUrl(userId, "video", fileName)
 
-    console.log("Fazendo upload de vídeo para:", uploadUrl)
+    console.log("📤 Fazendo upload de vídeo com nova estrutura:", {
+      structure: `${userId}/videos/${fileName}`,
+      success: true
+    })
 
     const response = await fetch(uploadUrl, {
       method: "PUT",
@@ -222,10 +230,10 @@ export async function uploadVideoMinio(
       throw new Error(`Upload failed: ${response.statusText}`)
     }
 
-    // URL final do vídeo
-    const videoUrl = `https://avs3.guardia.work/rar/${filePath}`
+    // URL final do vídeo com nova estrutura
+    const videoUrl = getMinioUserFileUrl(userId, "video", fileName)
 
-    console.log("Upload de vídeo bem-sucedido:", videoUrl)
+    console.log("✅ Upload de vídeo com nova estrutura bem-sucedido")
 
     return {
       success: true,

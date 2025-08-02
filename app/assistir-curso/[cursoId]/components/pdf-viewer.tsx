@@ -109,7 +109,7 @@ export function PDFViewer({ src, title, onProgress }: PDFViewerProps) {
             <div className="text-center text-slate-400">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-400 mx-auto mb-4"></div>
               <p>Carregando documento...</p>
-              <p className="text-xs text-slate-500 mt-2">URL: {src}</p>
+              <p className="text-xs text-slate-500 mt-2">Preparando visualização...</p>
             </div>
           </div>
         )}

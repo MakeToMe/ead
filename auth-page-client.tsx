@@ -12,14 +12,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { clientSignIn, clientSignUp } from "@/lib/auth-client"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function AuthPageClient() {
   const [activeTab, setActiveTab] = useState("login")
-  const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [messageType, setMessageType] = useState<"success" | "error">("error")
   const router = useRouter()
+  const { signIn, signUp, isLoading, error, clearError } = useAuth()
 
   const formVariants = {
     hidden: { opacity: 0, x: activeTab === "login" ? -20 : 20 },
@@ -29,34 +29,36 @@ export default function AuthPageClient() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setIsLoading(true)
     setMessage("")
+    clearError()
 
     const formData = new FormData(e.currentTarget)
     const email = formData.get("email") as string
     const password = formData.get("password") as string
 
     try {
-      const user = await clientSignIn(email, password)
+      const user = await signIn(email, password)
       setMessage(`Login bem-sucedido! Bem-vindo, ${user.nome}`)
       setMessageType("success")
 
-      // Redirecionar após 1 segundo
+      console.log('✅ AuthPageClient: Login bem-sucedido, redirecionando para dashboard')
+      
+      // Redirecionamento imediato - AuthService já gerencia tudo
       setTimeout(() => {
         router.push("/dashboard")
-      }, 1000)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Erro ao fazer login")
+      }, 500)
+    } catch (authError) {
+      const errorMessage = authError instanceof Error ? authError.message : "Erro ao fazer login"
+      setMessage(errorMessage)
       setMessageType("error")
-    } finally {
-      setIsLoading(false)
+      console.error('❌ AuthPageClient: Erro no login', authError)
     }
   }
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setIsLoading(true)
     setMessage("")
+    clearError()
 
     const formData = new FormData(e.currentTarget)
     const name = formData.get("name") as string
@@ -64,41 +66,41 @@ export default function AuthPageClient() {
     const password = formData.get("password") as string
     const confirmPassword = formData.get("confirmPassword") as string
 
+    // Validações no cliente
     if (!name || !email || !password || !confirmPassword) {
       setMessage("Todos os campos são obrigatórios.")
       setMessageType("error")
-      setIsLoading(false)
       return
     }
 
     if (password !== confirmPassword) {
       setMessage("As senhas não coincidem.")
       setMessageType("error")
-      setIsLoading(false)
       return
     }
 
     if (password.length < 6) {
       setMessage("A senha deve ter pelo menos 6 caracteres.")
       setMessageType("error")
-      setIsLoading(false)
       return
     }
 
     try {
-      const user = await clientSignUp(name, email, password)
+      const user = await signUp(name, email, password)
       setMessage(`Conta criada com sucesso! Bem-vindo, ${user.nome}`)
       setMessageType("success")
 
-      // Redirecionar após 1 segundo
+      console.log('✅ AuthPageClient: Cadastro bem-sucedido, redirecionando para dashboard')
+      
+      // Redirecionamento imediato - AuthService já gerencia tudo
       setTimeout(() => {
         router.push("/dashboard")
-      }, 1000)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Erro ao criar conta")
+      }, 500)
+    } catch (authError) {
+      const errorMessage = authError instanceof Error ? authError.message : "Erro ao criar conta"
+      setMessage(errorMessage)
       setMessageType("error")
-    } finally {
-      setIsLoading(false)
+      console.error('❌ AuthPageClient: Erro no cadastro', authError)
     }
   }
 
@@ -139,9 +141,9 @@ export default function AuthPageClient() {
                       <Link href="#" className="text-sm font-medium text-primary hover:underline" prefetch={false}>
                         Esqueceu a senha?
                       </Link>
-                      {message && (
+                      {(message || error) && (
                         <p className={`text-sm ${messageType === "success" ? "text-green-500" : "text-red-500"}`}>
-                          {message}
+                          {message || error?.message}
                         </p>
                       )}
                     </CardContent>
@@ -178,9 +180,9 @@ export default function AuthPageClient() {
                         <Label htmlFor="confirm-password-signup">Confirmar Senha</Label>
                         <Input id="confirm-password-signup" name="confirmPassword" type="password" required />
                       </div>
-                      {message && (
+                      {(message || error) && (
                         <p className={`text-sm ${messageType === "success" ? "text-green-500" : "text-red-500"}`}>
-                          {message}
+                          {message || error?.message}
                         </p>
                       )}
                     </CardContent>

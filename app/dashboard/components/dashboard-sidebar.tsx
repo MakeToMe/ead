@@ -12,111 +12,59 @@ import {
   ChevronRight,
   Menu,
   X,
-  RefreshCw,
   PlusCircle,
   PlayCircle,
   BookOpen,
   Settings,
   Award,
 } from "lucide-react"
-import { destroyClientSession, type User as AuthUser } from "@/lib/auth-client"
 import { useMobile } from "@/hooks/use-mobile"
-import { getUserFresh, getSignedPhotoUrl } from "./sidebar-actions"
+import { useAuth } from "@/contexts/auth-context"
+import { usePhotoDisplay } from "@/hooks/use-photo"
 
 interface DashboardSidebarProps {
-  user: AuthUser
+  user?: any // Mantido para compatibilidade, mas não usado
 }
 
 export default function DashboardSidebar({ user: initialUser }: DashboardSidebarProps) {
-  const [user, setUser] = useState<AuthUser>(initialUser)
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  // Usar dados do hook otimizado
+  const { user, signOut } = useAuth()
+  
+  // Usar hook de foto unificado
+  const { photoUrl, fallbackInitial, isLoading: photoLoading, hasError } = usePhotoDisplay(
+    user?.uid,
+    user?.url_foto,
+    user?.nome
+  )
+  
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [manuallyCollapsed, setManuallyCollapsed] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const isMobile = useMobile()
 
-  // Carregar foto do usuário
+  // Log detalhado dos dados recebidos (apenas quando muda)
   useEffect(() => {
-    const loadPhoto = async () => {
-      if (user?.url_foto) {
-        const signedUrl = await getSignedPhotoUrl(user.url_foto)
-        if (signedUrl) {
-          setPhotoUrl(signedUrl)
-        } else {
-          setPhotoUrl(null)
-        }
-      } else {
-        setPhotoUrl(null)
-      }
+    if (user?.uid) {
+      console.log('🎯 DashboardSidebar: Usuário carregado', {
+        userId: user.uid,
+        nome: user.nome,
+        perfil: user.perfis
+      })
     }
-    loadPhoto()
-  }, [user?.url_foto, user?.email])
+  }, [user?.uid]) // Apenas quando o ID do usuário muda
 
-  // Atualiza dados do usuário quando a rota muda
+  // Log da foto apenas quando há mudanças significativas
   useEffect(() => {
-    const refreshUserData = async () => {
-      if (!user?.email) {
-        return
-      }
-
-      try {
-        const freshUser = await getUserFresh(user.email)
-        if (freshUser) {
-          // Verificar se é realmente o mesmo usuário
-          if (freshUser.email !== user.email) {
-            // Forçar logout se dados não conferem
-            handleLogout()
-            return
-          }
-
-          setUser(freshUser)
-
-          // Atualizar foto se mudou
-          if (freshUser.url_foto) {
-            const signedUrl = await getSignedPhotoUrl(freshUser.url_foto)
-            setPhotoUrl(signedUrl)
-          } else {
-            setPhotoUrl(null)
-          }
-        }
-      } catch (error) {
-        console.error("💥 Erro ao atualizar dados da sidebar:", error)
-      }
+    if (user?.uid && (photoUrl || hasError)) {
+      console.log('📷 DashboardSidebar: Foto carregada', { 
+        userId: user.uid,
+        hasPhoto: !!photoUrl,
+        hasError
+      })
     }
-
-    // Refresh sempre que a rota mudar
-    refreshUserData()
-
-    // Refresh adicional quando sair da página de perfil
-    if (pathname !== "/perfil") {
-      const timer = setTimeout(refreshUserData, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [pathname, user?.email])
-
-  // Adicionar listener para evento customizado de atualização
-  useEffect(() => {
-    const handleProfileUpdate = async () => {
-      if (user?.email) {
-        const freshUser = await getUserFresh(user.email)
-        if (freshUser) {
-          setUser(freshUser)
-          if (freshUser.url_foto) {
-            const signedUrl = await getSignedPhotoUrl(freshUser.url_foto)
-            setPhotoUrl(signedUrl)
-          } else {
-            setPhotoUrl(null)
-          }
-        }
-      }
-    }
-
-    window.addEventListener("profileUpdated", handleProfileUpdate)
-    return () => window.removeEventListener("profileUpdated", handleProfileUpdate)
-  }, [user?.email])
+  }, [user?.uid, !!photoUrl, hasError]) // Apenas mudanças significativas
 
   // Auto-collapse em telas pequenas, mas respeita escolha manual em desktop
   useEffect(() => {
@@ -128,22 +76,24 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
     }
   }, [isMobile, manuallyCollapsed])
 
-  const handleLogout = () => {
-    // Limpar todos os estados locais
-    setUser({} as AuthUser)
-    setPhotoUrl(null)
-
-    // Limpar localStorage
-    if (typeof window !== "undefined") {
-      localStorage.clear()
-      sessionStorage.clear()
+  const handleLogout = async () => {
+    console.log('🚪 DashboardSidebar: Iniciando logout')
+    
+    try {
+      // AuthService cuida de tudo: servidor, cache, cookies, etc.
+      await signOut()
+      
+      console.log('✅ DashboardSidebar: Logout bem-sucedido')
+      
+      // Redirecionar para página inicial
+      router.push("/")
+      
+    } catch (error) {
+      console.error('❌ DashboardSidebar: Erro no logout', error)
+      
+      // Mesmo com erro, redirecionar
+      router.push("/")
     }
-
-    // Destruir sessão
-    destroyClientSession()
-
-    // Forçar reload completo da página
-    window.location.href = "/"
   }
 
   const toggleCollapse = () => {
@@ -157,30 +107,7 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
     setIsMobileOpen(!isMobileOpen)
   }
 
-  // Atualização manual dos dados
-  const refreshData = async () => {
-    if (!user?.email || isRefreshing) return
-
-    setIsRefreshing(true)
-
-    try {
-      const freshUser = await getUserFresh(user.email)
-      if (freshUser) {
-        setUser(freshUser)
-        // Atualizar foto se mudou
-        if (freshUser.url_foto) {
-          const signedUrl = await getSignedPhotoUrl(freshUser.url_foto)
-          setPhotoUrl(signedUrl)
-        } else {
-          setPhotoUrl(null)
-        }
-      }
-    } catch (error) {
-      console.error("💥 Erro no refresh manual:", error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
+  // Dados vêm automaticamente do AuthService via hook otimizado
 
   const menuItems = [
     {
@@ -264,16 +191,7 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
             </AnimatePresence>
           </div>
 
-          {!isCollapsed && (
-            <button
-              onClick={refreshData}
-              className="text-slate-400 hover:text-white transition-colors"
-              disabled={isRefreshing}
-              title="Atualizar dados"
-            >
-              <RefreshCw size={16} className={`${isRefreshing ? "animate-spin" : ""}`} />
-            </button>
-          )}
+          {/* Dados atualizados automaticamente via AuthService */}
         </div>
       </div>
 
@@ -291,18 +209,21 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
             >
               {/* Foto do usuário */}
               <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-slate-700 rounded-full flex items-center justify-center overflow-hidden">
-                {photoUrl ? (
+                {photoLoading ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : photoUrl ? (
                   <img
-                    src={photoUrl || "/placeholder.svg"}
+                    src={photoUrl}
                     alt={user?.nome}
                     className="w-full h-full object-cover"
                     onError={() => {
                       console.log("❌ Erro ao carregar imagem, usando fallback")
-                      setPhotoUrl(null)
                     }}
                   />
                 ) : (
-                  <span className="text-white font-bold text-xl">{user?.nome?.charAt(0).toUpperCase() || "?"}</span>
+                  <span className="text-white font-bold text-xl">{fallbackInitial}</span>
                 )}
               </div>
 
@@ -322,15 +243,19 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
               className="flex justify-center"
             >
               <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-700 rounded-full flex items-center justify-center overflow-hidden">
-                {photoUrl ? (
+                {photoLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : photoUrl ? (
                   <img
-                    src={photoUrl || "/placeholder.svg"}
+                    src={photoUrl}
                     alt={user?.nome}
                     className="w-full h-full object-cover"
-                    onError={() => setPhotoUrl(null)}
+                    onError={() => {
+                      console.log("❌ Erro ao carregar imagem colapsada, usando fallback")
+                    }}
                   />
                 ) : (
-                  <span className="text-white font-bold text-sm">{user?.nome?.charAt(0).toUpperCase() || "?"}</span>
+                  <span className="text-white font-bold text-sm">{fallbackInitial}</span>
                 )}
               </div>
             </motion.div>

@@ -79,11 +79,11 @@ export function ContentViewer({ aula, onProgress, onCompleted }: ContentViewerPr
                 <p className="font-medium">Conteúdo em preparação</p>
                 <p className="text-sm">Este material ainda não foi disponibilizado</p>
               </div>
-              {/* Debug info */}
+              {/* Status info */}
               <div className="text-xs text-slate-600 bg-slate-700/30 p-2 rounded">
                 <div>ID: {aula.id}</div>
                 <div>Tipo: {aula.tipo}</div>
-                <div>URL: {aula.media_url || "Não definida"}</div>
+                <div>Status: Conteúdo não disponível</div>
               </div>
             </div>
           </CardContent>
@@ -129,11 +129,11 @@ export function ContentViewer({ aula, onProgress, onCompleted }: ContentViewerPr
               <p className="font-medium">Tipo de conteúdo não suportado</p>
               <p className="text-sm">Tipo: {aula.tipo}</p>
             </div>
-            {/* Debug info */}
+            {/* Status info */}
             <div className="text-xs text-slate-600 bg-slate-700/30 p-2 rounded">
               <div>ID: {aula.id}</div>
               <div>Tipo: {aula.tipo}</div>
-              <div>URL: {aula.media_url}</div>
+              <div>Status: Tipo não suportado</div>
             </div>
           </div>
         </CardContent>

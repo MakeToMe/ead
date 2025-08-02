@@ -3,7 +3,8 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { getCurrentClientUser, type User as AuthUser } from "@/lib/auth-client"
+import { useAuth } from "@/contexts/auth-context"
+import type { User } from "@/lib/auth-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -24,22 +25,30 @@ import {
   Trash2,
 } from "lucide-react"
 import { getUserFreshData, updateUserProfile, getSignedPhotoUrl } from "./actions"
+import { usePhoto } from "@/hooks/use-photo"
 import ModalUploadFoto from "./components/modal-upload-foto"
 import VerificacaoContato from "./components/verificacao-contato"
 import SocialLinksCard from "./components/social-links-card"
 
 export default function PerfilPage() {
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const { user: authUser, isLoading: authLoading } = useAuth()
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     nome: "",
     email: "",
     whatsapp: "",
     bio: "",
   })
+  
+  // Usar hook de foto unificado
+  const { photoUrl, fallbackInitial, isLoading: photoLoading, updatePhoto } = usePhoto(
+    user?.uid,
+    user?.url_foto,
+    user?.nome
+  )
 
   const [mensagem, setMensagem] = useState<{
     tipo: "sucesso" | "erro"
@@ -67,19 +76,16 @@ export default function PerfilPage() {
     }
   }
 
-  // Carregar dados básicos primeiro
+  // Carregar dados quando usuário estiver disponível
   useEffect(() => {
     const loadData = async () => {
+      if (!authUser?.uid) return
+      
       setLoading(true)
 
-      // Buscar dados do usuário atual
-      const currentUser = getCurrentClientUser()
-      console.log("Usuário atual no perfil:", currentUser)
-
-      if (currentUser?.uid) {
+      try {
         // Buscar dados frescos do banco
-        const freshUserData = await getUserFreshData(currentUser.uid)
-        console.log("Dados frescos do perfil:", freshUserData)
+        const freshUserData = await getUserFreshData(authUser.uid)
 
         if (freshUserData) {
           setUser(freshUserData)
@@ -89,20 +95,24 @@ export default function PerfilPage() {
             whatsapp: freshUserData.whatsapp || "",
             bio: freshUserData.bio || "",
           })
-
-          // Se tem foto, gerar URL assinada
-          if (freshUserData.url_foto) {
-            const signedUrl = await getSignedPhotoUrl(freshUserData.url_foto)
-            setPhotoUrl(signedUrl)
-          }
         }
+      } catch (error) {
+        console.error('❌ PerfilPage: Erro ao carregar dados do usuário', error)
+        // Usar dados do AuthService como fallback
+        setUser(authUser)
+        setFormData({
+          nome: authUser.nome || "",
+          email: authUser.email || "",
+          whatsapp: (authUser as any).whatsapp || "",
+          bio: (authUser as any).bio || "",
+        })
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
 
     loadData()
-  }, [])
+  }, [authUser?.uid])
 
   // Limpar mensagens após 5 segundos
   useEffect(() => {
@@ -159,8 +169,8 @@ export default function PerfilPage() {
             bio: freshUserData.bio || "",
           })
 
-          // Disparar evento para atualizar sidebar
-          window.dispatchEvent(new CustomEvent("profileUpdated"))
+          // AuthService será notificado automaticamente na próxima verificação de sessão
+          console.log('✅ Perfil: Dados atualizados, AuthService sincronizará automaticamente')
         }
       }
       await loadFreshData(user.uid)
@@ -176,9 +186,8 @@ export default function PerfilPage() {
     // Atualizar o estado do usuário com o novo caminho da foto
     if (user) {
       setUser({ ...user, url_foto: filePath })
-      // Gerar nova URL assinada
-      const signedUrl = await getSignedPhotoUrl(filePath)
-      setPhotoUrl(signedUrl)
+      // Usar o hook para atualizar a foto
+      await updatePhoto(filePath)
     }
   }
 
@@ -216,7 +225,8 @@ export default function PerfilPage() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
   }
 
-  if (loading) {
+  // Loading states
+  if (authLoading || loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
         <div className="text-center">
@@ -227,7 +237,8 @@ export default function PerfilPage() {
     )
   }
 
-  if (!user) {
+  // Se não há usuário autenticado ou dados carregados
+  if (!authUser || !user) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
         <div className="text-center">
@@ -260,15 +271,16 @@ export default function PerfilPage() {
                 onClick={() => setIsModalOpen(true)}
               >
                 <div className="w-24 h-24 bg-gradient-to-br from-indigo-600 to-slate-700 rounded-full flex items-center justify-center shadow-xl overflow-hidden">
-                  {photoUrl ? (
+                  {photoLoading ? (
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : photoUrl ? (
                     <img
-                      src={photoUrl || "/placeholder.svg"}
+                      src={photoUrl}
                       alt={user.nome}
                       className="w-full h-full object-cover"
-                      onError={() => setPhotoUrl(null)}
                     />
                   ) : (
-                    <span className="text-white font-bold text-3xl">{user.nome.charAt(0).toUpperCase()}</span>
+                    <span className="text-white font-bold text-3xl">{fallbackInitial}</span>
                   )}
                 </div>
                 <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">

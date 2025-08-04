@@ -49,16 +49,21 @@ class AuthService {
 
   private callbacks: Set<AuthChangeCallback> = new Set()
   private readonly CACHE_TTL = 300000 // 5 minutos
-  private readonly SESSION_CHECK_DEBOUNCE = 1000 // 1 segundo
-  private readonly MAX_RETRIES = 3
+  private readonly SESSION_CHECK_DEBOUNCE = 5000 // 5 segundos (aumentado para reduzir requisições)
+  private readonly MAX_RETRIES = 1 // Reduzido para 1 retry apenas
   private sessionCheckTimer: NodeJS.Timeout | null = null
   private pendingSessionCheck: Promise<User | null> | null = null
   private requestCache: Map<string, { promise: Promise<any>, timestamp: number }> = new Map()
   private retryCount = 0
+  private initialized = false
+  private consecutiveErrors = 0
+  private readonly MAX_CONSECUTIVE_ERRORS = 5
+  private circuitBreakerUntil = 0
+  private readonly CIRCUIT_BREAKER_TIMEOUT = 60000 // 1 minuto
 
   constructor() {
-    // Inicializar verificação de sessão apenas no cliente
-    if (typeof window !== 'undefined') {
+    // Inicializar verificação de sessão apenas no cliente e apenas uma vez
+    if (typeof window !== 'undefined' && !this.initialized) {
       this.initializeSession()
     }
   }
@@ -210,6 +215,13 @@ class AuthService {
   async checkSession(): Promise<User | null> {
     const cacheKey = 'session-check'
     
+    // Verificar circuit breaker
+    if (this.isCircuitBreakerOpen()) {
+      console.log('🚫 AuthService: Circuit breaker ativo - pulando verificação de sessão')
+      this.setLoading(false)
+      return this.state.user
+    }
+    
     // Se já há uma verificação em andamento, reutilizar
     if (this.pendingSessionCheck) {
       console.log('🔄 AuthService: Reutilizando verificação de sessão em andamento')
@@ -241,9 +253,17 @@ class AuthService {
     try {
       const user = await this.pendingSessionCheck
       this.retryCount = 0 // Reset retry count on success
+      this.consecutiveErrors = 0 // Reset consecutive errors on success
       return user
     } catch (error) {
       console.error('❌ AuthService: Erro na verificação de sessão', error)
+      this.consecutiveErrors++
+      
+      // Ativar circuit breaker se muitos erros consecutivos
+      if (this.consecutiveErrors >= this.MAX_CONSECUTIVE_ERRORS) {
+        this.activateCircuitBreaker()
+      }
+      
       throw error
     } finally {
       this.pendingSessionCheck = null
@@ -308,7 +328,10 @@ class AuthService {
       cacheValid: this.isCacheValid(),
       lastChecked: new Date(this.state.lastChecked).toISOString(),
       expiresAt: new Date(this.state.expiresAt).toISOString(),
-      callbacksCount: this.callbacks.size
+      callbacksCount: this.callbacks.size,
+      consecutiveErrors: this.consecutiveErrors,
+      circuitBreakerActive: this.isCircuitBreakerOpen(),
+      circuitBreakerUntil: this.circuitBreakerUntil > 0 ? new Date(this.circuitBreakerUntil).toISOString() : null
     }
   }
 
@@ -316,22 +339,23 @@ class AuthService {
    * Inicializa verificação de sessão com debounce
    */
   private async initializeSession(): Promise<void> {
-    // Debounce para evitar múltiplas inicializações
-    if (this.sessionCheckTimer) {
-      clearTimeout(this.sessionCheckTimer)
+    // Evitar múltiplas inicializações
+    if (this.initialized) {
+      console.log('⚠️ AuthService: Já inicializado, ignorando')
+      return
     }
 
-    this.sessionCheckTimer = setTimeout(async () => {
-      try {
-        console.log('🚀 AuthService: Inicializando verificação de sessão')
-        await this.checkSession()
-      } catch (error) {
-        console.warn('⚠️ AuthService: Erro na inicialização da sessão', error)
-        this.setLoading(false)
-      } finally {
-        this.sessionCheckTimer = null
-      }
-    }, 100) // Pequeno delay para evitar múltiplas chamadas
+    this.initialized = true
+
+    // Verificação única na inicialização (sem loops)
+    console.log('🚀 AuthService: Verificação única de sessão na inicialização')
+    
+    try {
+      await this.checkSession()
+    } catch (error) {
+      console.warn('⚠️ AuthService: Erro na inicialização da sessão', error)
+      this.setLoading(false)
+    }
   }
 
   /**
@@ -347,9 +371,17 @@ class AuthService {
     this.setLoading(true)
 
     try {
+      console.log('🔍 AuthService: Fazendo requisição para /api/auth/me', {
+        timestamp: new Date().toISOString(),
+        stackTrace: new Error().stack?.split('\n').slice(1, 4)
+      })
+      
       const response = await fetch('/api/auth/me', {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       })
 
       if (response.status === 401) {
@@ -377,10 +409,17 @@ class AuthService {
     } catch (error) {
       console.error('❌ AuthService: Erro na verificação de sessão', error)
       
-      // Implementar retry com backoff para erros de rede
+      // Verificar se é erro de CORS - não fazer retry
+      if (this.isCorsError(error)) {
+        console.error('🚫 AuthService: Erro de CORS detectado - parando tentativas')
+        this.clearSession()
+        return null
+      }
+      
+      // Implementar retry com backoff para erros de rede (exceto CORS)
       if (this.isNetworkError(error) && this.retryCount < this.MAX_RETRIES) {
         this.retryCount++
-        const delay = Math.pow(2, this.retryCount) * 1000 // Exponential backoff
+        const delay = Math.pow(2, this.retryCount) * 2000 // Aumentado o delay base
         
         console.log(`🔄 AuthService: Tentativa ${this.retryCount}/${this.MAX_RETRIES} em ${delay}ms`)
         
@@ -505,6 +544,31 @@ class AuthService {
   }
 
   /**
+   * Verifica se erro é de CORS
+   */
+  private isCorsError(error: any): boolean {
+    return error instanceof TypeError && 
+           (error.message.includes('CORS') || 
+            error.message.includes('Cross-Origin') ||
+            error.message.includes('blocked'))
+  }
+
+  /**
+   * Verifica se o circuit breaker está ativo
+   */
+  private isCircuitBreakerOpen(): boolean {
+    return Date.now() < this.circuitBreakerUntil
+  }
+
+  /**
+   * Ativa o circuit breaker
+   */
+  private activateCircuitBreaker(): void {
+    this.circuitBreakerUntil = Date.now() + this.CIRCUIT_BREAKER_TIMEOUT
+    console.warn(`🚫 AuthService: Circuit breaker ativado por ${this.CIRCUIT_BREAKER_TIMEOUT/1000}s devido a ${this.consecutiveErrors} erros consecutivos`)
+  }
+
+  /**
    * Cria erro de autenticação com contexto
    */
   private createAuthError(type: AuthError['type'], message: string, code?: string, context?: any): Error {
@@ -562,7 +626,19 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     checkSession: () => authService.checkSession(),
     refreshSession: () => authService.refreshSession(),
     clearCache: () => authService.clearCache(),
-    signOut: () => authService.signOut()
+    signOut: () => authService.signOut(),
+    stopAll: () => {
+      console.log('🛑 PARANDO TODAS AS VERIFICAÇÕES DE SESSÃO')
+      authService.clearCache()
+      // Limpar todos os timers e requests pendentes
+      if (authService.sessionCheckTimer) {
+        clearTimeout(authService.sessionCheckTimer)
+        authService.sessionCheckTimer = null
+      }
+      authService.pendingSessionCheck = null
+      authService.requestCache.clear()
+      console.log('✅ Todas as verificações paradas')
+    }
   }
 }
 

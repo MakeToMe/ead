@@ -16,11 +16,8 @@ export default function DebugLoader() {
       // Aguardar um pouco para garantir que tudo está carregado
       const timer = setTimeout(() => {
         Promise.all([
-          import("@/lib/test-consistency-detection").catch(() => {}),
-          import("@/lib/test-auto-correction").catch(() => {}),
-          import("@/lib/emergency-stop").catch(() => {}),
           import("@/lib/debug-dashboard").catch(() => {}),
-          import("@/lib/console-commands").catch(() => {})
+          import("@/lib/auth-service").catch(() => {})
         ]).then(() => {
           console.log('🛠️ Debug tools loaded successfully')
         }).catch(() => {

@@ -99,31 +99,32 @@ export async function uploadProfilePhoto(userId: string, file: File) {
 }
 
 export async function getSignedPhotoUrl(filePath: string) {
-  const supabase = createServerSupabaseClient()
-
   try {
-    console.log("Tentando gerar URL assinada para:", filePath)
+    console.log("📸 Perfil: Gerando URL para foto:", filePath)
 
-    // Se o filePath for uma URL completa, extrair apenas o caminho
-    let cleanPath = filePath
-    if (filePath.includes("storage/v1/object/public/ead/")) {
-      cleanPath = filePath.split("storage/v1/object/public/ead/")[1]
-      console.log("URL completa detectada, extraindo caminho:", cleanPath)
-    }
-
-    // Tentar gerar URL assinada
-    const { data, error } = await supabase.storage.from("ead").createSignedUrl(cleanPath, 3600) // 1 hora
-
-    if (error) {
-      console.error("Erro ao gerar URL assinada:", error)
-      console.log("Caminho que falhou:", cleanPath)
+    // Se não há filePath, retornar null
+    if (!filePath) {
+      console.warn("⚠️ Perfil: FilePath vazio para foto")
       return null
     }
 
-    console.log("URL assinada gerada com sucesso:", data.signedUrl)
-    return data.signedUrl
+    // Para MinIO, vamos usar a URL direta
+    const { getMinioClientFileUrl } = await import("@/lib/minio-config")
+    const photoUrl = getMinioClientFileUrl(filePath)
+    
+    console.log("✅ Perfil: URL da foto gerada:", photoUrl)
+    console.log("📋 Perfil: Configuração MinIO:", {
+      endpoint: process.env.NEXT_PUBLIC_MINIO_ENDPOINT,
+      bucket: process.env.NEXT_PUBLIC_MINIO_BUCKET,
+      filePath
+    })
+    
+    // Não vamos testar com HEAD por enquanto para evitar problemas de CORS
+    // A URL será testada quando for carregada na imagem
+    
+    return photoUrl
   } catch (error) {
-    console.error("Erro na função getSignedPhotoUrl:", error)
+    console.error("❌ Perfil: Erro ao gerar URL da foto:", error)
     return null
   }
 }

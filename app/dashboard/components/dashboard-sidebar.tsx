@@ -218,8 +218,13 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
                     src={photoUrl}
                     alt={user?.nome}
                     className="w-full h-full object-cover"
-                    onError={() => {
+                    onError={(e) => {
                       console.log("❌ Erro ao carregar imagem, usando fallback")
+                      console.log("🔍 URL que falhou:", photoUrl)
+                      console.log("🔍 Erro da imagem:", e)
+                    }}
+                    onLoad={() => {
+                      console.log("✅ Imagem carregada com sucesso:", photoUrl)
                     }}
                   />
                 ) : (

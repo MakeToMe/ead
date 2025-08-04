@@ -68,18 +68,43 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
   }, [user])
 
   useEffect(() => {
-    if (user?.uid) {
+    if (user?.uid && !loading) {
       loadStats()
     }
-  }, [user])
+  }, [user?.uid]) // Apenas reagir a mudanças no UID
 
   const loadStats = async () => {
     try {
       setLoading(true)
+      console.log("📊 DashboardAdmin: Carregando estatísticas para:", { userId: user.uid, perfil: user.perfis })
+      
       const adminStats = await getAdminStats(user.uid, user.perfis)
-      setStats(adminStats)
+      console.log("📊 DashboardAdmin: Estatísticas recebidas:", adminStats)
+      
+      // Verificação defensiva
+      if (adminStats && typeof adminStats === 'object') {
+        const newStats = {
+          cursosCount: adminStats.cursosCount || 0,
+          aulasCount: adminStats.aulasCount || 0,
+          alunosCount: adminStats.alunosCount || 0,
+        }
+        console.log("✅ DashboardAdmin: Definindo stats:", newStats)
+        setStats(newStats)
+      } else {
+        console.warn("⚠️ DashboardAdmin: Estatísticas inválidas recebidas:", adminStats)
+        setStats({
+          cursosCount: 0,
+          aulasCount: 0,
+          alunosCount: 0,
+        })
+      }
     } catch (error) {
-      console.error("Erro ao carregar estatísticas:", error)
+      console.error("❌ DashboardAdmin: Erro ao carregar estatísticas:", error)
+      setStats({
+        cursosCount: 0,
+        aulasCount: 0,
+        alunosCount: 0,
+      })
     } finally {
       setLoading(false)
     }

@@ -38,7 +38,7 @@ export async function getDashboardStats(userId: string) {
       .eq("status", "ativa")
 
     if (coursesError) {
-      console.error("Erro ao buscar cursos matriculados:", coursesError)
+      console.error("❌ Erro ao buscar cursos matriculados:", coursesError)
     }
 
     // Buscar quantidade de certificados ativos emitidos para o usuário
@@ -49,7 +49,7 @@ export async function getDashboardStats(userId: string) {
       .eq("status", "ativo")
 
     if (certificatesError) {
-      console.error("Erro ao buscar certificados:", certificatesError)
+      console.error("❌ Erro ao buscar certificados:", certificatesError)
     }
 
     // Buscar atividades recentes
@@ -62,16 +62,19 @@ export async function getDashboardStats(userId: string) {
       .limit(5)
 
     if (activitiesError) {
-      console.error("Erro ao buscar atividades recentes:", activitiesError)
+      console.error("❌ Erro ao buscar atividades recentes:", activitiesError)
     }
 
-    return {
+    const result = {
       coursesCount: coursesCount || 0,
-      certificatesCount,
+      certificatesCount: certificatesCount || 0,
       recentActivities: recentActivities || [],
     }
+
+    console.log("✅ Dashboard: Stats carregadas -", `${result.coursesCount} cursos, ${result.certificatesCount} certificados, ${result.recentActivities.length} atividades`)
+    return result
   } catch (error) {
-    console.error("Erro ao buscar estatísticas:", error)
+    console.error("❌ getDashboardStats: Erro ao buscar estatísticas:", error)
     return {
       coursesCount: 0,
       certificatesCount: 0,

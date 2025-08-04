@@ -75,16 +75,20 @@ export default function AdministracaoPage() {
         // Atualizar a lista local
         setUsers(users.map((user) => (user.uid === userId ? { ...user, perfis: newProfile } : user)))
         
-        // Notificar UserStateManager para invalidar cache e atualizar sidebar
-        console.log('🔄 Admin: Notificando UserStateManager sobre mudança de perfil', { userId, newProfile })
+        // Notificar AuthService para invalidar cache e atualizar sidebar
+        console.log('🔄 Admin: Notificando AuthService sobre mudança de perfil', { userId, newProfile })
         
         // Importar dinamicamente para evitar dependência circular
-        const { default: userStateManager } = await import("@/lib/user-state-manager")
+        const { default: authService } = await import("@/lib/auth-service")
         
-        // Invalidar cache do usuário específico (se for o usuário atual)
-        userStateManager.invalidateUserCache(userId)
+        // Se for o usuário atual, invalidar cache para atualizar sidebar
+        const currentUser = authService.getCurrentUser()
+        if (currentUser && currentUser.uid === userId) {
+          authService.clearCache()
+          console.log('✅ Admin: Cache do usuário atual invalidado')
+        }
         
-        console.log('✅ Admin: UserStateManager notificado com sucesso')
+        console.log('✅ Admin: AuthService notificado com sucesso')
       } else {
         mostrarMensagem("erro", result.error || "Erro ao atualizar perfil")
       }

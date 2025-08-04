@@ -44,10 +44,20 @@ export function GridAlunos({ user }: GridAlunosProps) {
     try {
       setLoading(true)
       const result = await getAlunos(user.uid, user.perfis, currentPage, itemsPerPage, search)
-      setAlunos(result.alunos)
-      setTotalPages(Math.ceil(result.total / itemsPerPage))
+      
+      // Verificação defensiva
+      if (result && typeof result === 'object') {
+        setAlunos(result.alunos || [])
+        setTotalPages(Math.ceil((result.total || 0) / itemsPerPage))
+      } else {
+        console.warn("Resultado inválido da função getAlunos:", result)
+        setAlunos([])
+        setTotalPages(0)
+      }
     } catch (error) {
       console.error("Erro ao carregar alunos:", error)
+      setAlunos([])
+      setTotalPages(0)
     } finally {
       setLoading(false)
     }

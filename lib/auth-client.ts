@@ -105,10 +105,10 @@ export function destroyClientSession() {
   console.log('🧹 destroyClientSession: Limpando sessão do cliente')
   clearCachedUser()
   
-  // Também limpar UserStateManager se disponível
+  // Também limpar AuthService se disponível
   if (typeof window !== 'undefined') {
-    import("@/lib/user-state-manager").then(({ default: userStateManager }) => {
-      userStateManager.clearAll()
+    import("@/lib/auth-service").then(({ default: authService }) => {
+      authService.clearCache()
     }).catch(() => {
       // Ignorar erro se não conseguir importar
     })

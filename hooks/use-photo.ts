@@ -32,12 +32,14 @@ export function usePhoto(
   userName: string | undefined,
   options: UsePhotoOptions = {}
 ): UsePhotoReturn {
-  const { autoRetry = true, retryDelay = 2000 } = options
+  const { autoRetry = false, retryDelay = 5000 } = options // Desabilitado por padrão para evitar loops
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [fallbackInitial, setFallbackInitial] = useState<string>('?')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const maxRetries = 3
 
   // Função para carregar foto
   const loadPhoto = useCallback(async () => {
@@ -61,13 +63,27 @@ export function usePhoto(
       if (!result.success && result.error) {
         setError(result.error)
         
-        // Auto-retry se habilitado
-        if (autoRetry && result.error !== 'Máximo de tentativas excedido') {
+        // Auto-retry se habilitado e não excedeu o limite
+        if (autoRetry && retryCount < maxRetries && result.error !== 'Máximo de tentativas excedido') {
           setTimeout(() => {
-            enhancedLogger.debug('usePhoto', 'Tentando retry automático', { userId })
+            enhancedLogger.debug('usePhoto', 'Tentando retry automático', { 
+              userId, 
+              retryCount: retryCount + 1,
+              maxRetries 
+            })
+            setRetryCount(prev => prev + 1)
             loadPhoto()
           }, retryDelay)
+        } else if (retryCount >= maxRetries) {
+          enhancedLogger.warn('usePhoto', 'Máximo de tentativas do hook excedido', {
+            userId,
+            retryCount,
+            maxRetries
+          })
         }
+      } else if (result.success) {
+        // Reset retry count on success
+        setRetryCount(0)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
@@ -130,6 +146,7 @@ export function usePhoto(
   // Carregar foto quando dados mudarem (com dependências específicas)
   useEffect(() => {
     if (userId && userName) {
+      setRetryCount(0) // Reset retry count when data changes
       loadPhoto()
     }
   }, [userId, photoPath, userName]) // Dependências específicas em vez de loadPhoto

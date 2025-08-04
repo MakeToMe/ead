@@ -23,31 +23,38 @@ export async function getUserFresh(email: string): Promise<AuthUser | null> {
 }
 
 export async function getSignedPhotoUrl(filePath: string) {
-  const supabase = createServerSupabaseClient()
-
   try {
-    // console.debug("Tentando gerar URL assinada para:", filePath)
+    console.log("📸 Sidebar: Gerando URL para foto:", filePath)
 
-    // Se o filePath for uma URL completa, extrair apenas o caminho
-    let cleanPath = filePath
-    if (filePath.includes("storage/v1/object/public/ead/")) {
-      cleanPath = filePath.split("storage/v1/object/public/ead/")[1]
-      // console.debug("URL completa detectada, extraindo caminho:", cleanPath)
-    }
-
-    // Tentar gerar URL assinada
-    const { data, error } = await supabase.storage.from("ead").createSignedUrl(cleanPath, 3600) // 1 hora
-
-    if (error) {
-      console.error("Erro ao gerar URL assinada:", error)
-      // console.debug("Caminho que falhou:", cleanPath)
+    // Se não há filePath, retornar null
+    if (!filePath) {
+      console.warn("⚠️ Sidebar: FilePath vazio para foto")
       return null
     }
 
-    // console.debug("URL assinada gerada com sucesso para sidebar")
-    return data.signedUrl
+    // Para MinIO, vamos usar a URL direta
+    const { getMinioClientFileUrl } = await import("@/lib/minio-config")
+    const photoUrl = getMinioClientFileUrl(filePath)
+    
+    console.log("✅ Sidebar: URL da foto gerada:", photoUrl)
+    console.log("📋 Sidebar: Configuração MinIO:", {
+      endpoint: process.env.NEXT_PUBLIC_MINIO_ENDPOINT,
+      bucket: process.env.NEXT_PUBLIC_MINIO_BUCKET,
+      filePath,
+      fullUrl: photoUrl
+    })
+    
+    // Vamos testar se a URL é válida
+    if (photoUrl) {
+      console.log("🔗 Sidebar: Testando URL:", photoUrl)
+    }
+    
+    // Não vamos testar com HEAD por enquanto para evitar problemas de CORS
+    // A URL será testada quando for carregada na imagem
+    
+    return photoUrl
   } catch (error) {
-    console.error("Erro na função getSignedPhotoUrl:", error)
+    console.error("❌ Sidebar: Erro ao gerar URL da foto:", error)
     return null
   }
 }

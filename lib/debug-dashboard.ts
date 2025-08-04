@@ -179,8 +179,8 @@ class DebugDashboard {
       // Obter estado do UserStateManager
       let userState = {}
       try {
-        const { default: userStateManager } = await import("@/lib/user-state-manager")
-        userState = userStateManager.getDebugInfo()
+        const { default: authService } = await import("@/lib/auth-service")
+        userState = authService.getDebugInfo()
       } catch (error) {
         userState = { error: 'Não disponível' }
       }
@@ -188,8 +188,8 @@ class DebugDashboard {
       // Obter estado do DataConsistencyValidator
       let consistencyState = {}
       try {
-        const { default: dataConsistencyValidator } = await import("@/lib/data-consistency-validator")
-        consistencyState = dataConsistencyValidator.getDebugInfo()
+        // Consistency validator removido - usando apenas AuthService
+        consistencyState = { status: 'AuthService only' }
       } catch (error) {
         consistencyState = { error: 'Não disponível' }
       }
@@ -310,16 +310,17 @@ class DebugDashboard {
     console.log(`🎯 DebugDashboard: Executando ação: ${action}`)
 
     try {
+      // Importar AuthService uma vez para reutilizar
+      const { default: authService } = await import("@/lib/auth-service")
+      
       switch (action) {
         case 'checkConsistency':
-          const { default: dataConsistencyValidator } = await import("@/lib/data-consistency-validator")
-          const report = await dataConsistencyValidator.validateConsistency()
-          console.log('📊 Consistency Report:', report)
+          const report = authService.getDebugInfo()
+          console.log('📊 Auth Service Report:', report)
           break
 
         case 'forceSync':
-          const { default: userStateManager } = await import("@/lib/user-state-manager")
-          await userStateManager.forceRefresh()
+          await authService.refreshSession()
           console.log('🔄 Force sync completed')
           break
 

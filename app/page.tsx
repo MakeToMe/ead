@@ -1,7 +1,7 @@
 "use client"
 
-import AuthPageClient from "../auth-page-client"
+import AuthPageClientV2 from "../auth-page-client-v2"
 
 export default function Page() {
-  return <AuthPageClient />
+  return <AuthPageClientV2 />
 }

@@ -6,6 +6,10 @@
  */
 
 import enhancedLogger from "@/lib/enhanced-logger"
+import { createLogger } from '@/lib/logger-factory'
+import { EnvironmentUtils } from '@/lib/utils/environment'
+
+const logger = createLogger('DebugDashboard', 'ERROR', 'Dashboard de debug visual')
 
 export interface DashboardState {
   userState: any
@@ -24,13 +28,13 @@ class DebugDashboard {
    * Mostra o dashboard de debug
    */
   show(): void {
-    if (process.env.NODE_ENV !== 'development') {
-      console.warn('⚠️ DebugDashboard: Disponível apenas em desenvolvimento')
+    if (!EnvironmentUtils.environmentValue(true, false)) {
+      logger.warn('DebugDashboard: Disponível apenas em desenvolvimento')
       return
     }
 
     if (this.isVisible) {
-      console.log('ℹ️ DebugDashboard: Dashboard já está visível')
+      logger.debug('DebugDashboard: Dashboard já está visível')
       return
     }
 
@@ -38,7 +42,7 @@ class DebugDashboard {
     this.startAutoUpdate()
     this.isVisible = true
 
-    console.log('📊 DebugDashboard: Dashboard exibido')
+    logger.debug('DebugDashboard: Dashboard exibido')
   }
 
   /**
@@ -51,7 +55,7 @@ class DebugDashboard {
     this.removeDashboard()
     this.isVisible = false
 
-    console.log('📊 DebugDashboard: Dashboard ocultado')
+    logger.debug('DebugDashboard: Dashboard ocultado')
   }
 
   /**
@@ -167,7 +171,7 @@ class DebugDashboard {
         </div>
       `
     } catch (error) {
-      console.error('❌ DebugDashboard: Erro ao atualizar conteúdo', error)
+      logger.error('Erro ao atualizar conteúdo', {}, error)
     }
   }
 
@@ -208,7 +212,7 @@ class DebugDashboard {
         lastUpdate: new Date().toLocaleTimeString()
       }
     } catch (error) {
-      console.error('❌ DebugDashboard: Erro ao obter estado', error)
+      logger.error('Erro ao obter estado', {}, error)
       return {
         userState: { error: 'Erro ao obter estado' },
         consistencyState: { error: 'Erro ao obter estado' },
@@ -307,41 +311,41 @@ class DebugDashboard {
    * Executa ação do dashboard
    */
   async executeAction(action: string): Promise<void> {
-    console.log(`🎯 DebugDashboard: Executando ação: ${action}`)
+    logger.debug(`Executando ação: ${action}`)
 
     try {
       switch (action) {
         case 'checkConsistency':
           const { default: dataConsistencyValidator } = await import("@/lib/data-consistency-validator")
           const report = await dataConsistencyValidator.validateConsistency()
-          console.log('📊 Consistency Report:', report)
+          logger.debug('Consistency Report:', report)
           break
 
         case 'forceSync':
           const { default: userStateManager } = await import("@/lib/user-state-manager")
           await userStateManager.forceRefresh()
-          console.log('🔄 Force sync completed')
+          logger.debug('Force sync completed')
           break
 
         case 'clearLogs':
           enhancedLogger.clearLogs()
-          console.log('🧹 Logs cleared')
+          logger.debug('Logs cleared')
           break
 
         case 'exportLogs':
           const exportData = enhancedLogger.exportLogs()
           this.downloadLogs(exportData)
-          console.log('📥 Logs exported')
+          logger.debug('Logs exported')
           break
 
         default:
-          console.warn(`⚠️ DebugDashboard: Ação desconhecida: ${action}`)
+          logger.warn(`Ação desconhecida: ${action}`)
       }
 
       // Atualizar dashboard após ação
       setTimeout(() => this.updateDashboardContent(), 500)
     } catch (error) {
-      console.error(`❌ DebugDashboard: Erro ao executar ação ${action}:`, error)
+      logger.error(`Erro ao executar ação ${action}:`, { action }, error)
     }
   }
 
@@ -386,18 +390,20 @@ class DebugDashboard {
 const debugDashboard = new DebugDashboard()
 
 // Adicionar ao window para acesso global (apenas desenvolvimento)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  (window as any).debugDashboard = debugDashboard
+EnvironmentUtils.onlyInDevelopment(() => {
+  EnvironmentUtils.onlyInClient(() => {
+    (window as any).debugDashboard = debugDashboard
 
-  // Atalho de teclado para mostrar/ocultar dashboard (Ctrl+Shift+D)
-  document.addEventListener('keydown', (event) => {
-    if (event.ctrlKey && event.shiftKey && event.key === 'D') {
-      event.preventDefault()
-      debugDashboard.toggle()
-    }
+    // Atalho de teclado para mostrar/ocultar dashboard (Ctrl+Shift+D)
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+        event.preventDefault()
+        debugDashboard.toggle()
+      }
+    })
+
+    logger.debug('DebugDashboard: Carregado! Use Ctrl+Shift+D para mostrar/ocultar')
   })
-
-  console.log('📊 DebugDashboard: Carregado! Use Ctrl+Shift+D para mostrar/ocultar')
-}
+})
 
 export default debugDashboard

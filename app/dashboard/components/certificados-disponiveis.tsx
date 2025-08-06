@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
 import { getCertificadosDisponiveis } from "@/firebase/certificados"
 import type { Certificado } from "@/types/types"
 import Link from "next/link"

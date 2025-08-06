@@ -1,10 +1,13 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { AuthProvider } from "@/contexts/auth-context"
+import { AuthProviderV2 } from "@/contexts/auth-context-v2"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Toaster } from "@/components/ui/toaster"
 import DebugLoader from "@/components/debug-loader"
+import LogCleanupInit from "@/components/log-cleanup-init"
+import "@/lib/logging-init" // Inicializar sistema de logging
+import "@/lib/utils/simple-log-cleanup" // Configurar limpeza de logs
 import "./globals.css"
 
 
@@ -52,11 +55,12 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <AuthProvider>
+        <AuthProviderV2>
           <DashboardLayout>{children}</DashboardLayout>
           <Toaster />
           <DebugLoader />
-        </AuthProvider>
+          <LogCleanupInit />
+        </AuthProviderV2>
       </body>
     </html>
   )

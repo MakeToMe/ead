@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
 import { cn } from "@/lib/utils"
 import {
   buscarCursoCompleto,

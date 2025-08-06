@@ -6,6 +6,8 @@
  */
 
 import enhancedLogger from "@/lib/enhanced-logger"
+import { logManager } from '@/lib/log-manager'
+import type { LogLevel } from '@/lib/types/logging'
 
 export interface ConsoleCommands {
   // Informações gerais
@@ -23,6 +25,14 @@ export interface ConsoleCommands {
   consistencyLogs(): void
   clearLogs(): void
   exportLogs(): void
+  
+  // Controles de logging
+  setLogLevel(level: LogLevel): void
+  setComponentLevel(component: string, level: LogLevel): void
+  showLogConfig(): void
+  enableQuietMode(): void
+  enableDebugMode(): void
+  enableNormalMode(): void
   
   // Dashboard
   showDashboard(): void
@@ -359,6 +369,71 @@ class ConsoleCommandsImpl implements ConsoleCommands {
   }
 
   /**
+   * Define nível global de logging
+   */
+  setLogLevel(level: LogLevel): void {
+    logManager.setGlobalLevel(level)
+    console.log(`📝 Nível global de logging definido para: ${level}`)
+  }
+
+  /**
+   * Define nível de logging para componente específico
+   */
+  setComponentLevel(component: string, level: LogLevel): void {
+    logManager.setComponentLevel(component, level)
+    console.log(`📝 Nível do componente ${component} definido para: ${level}`)
+  }
+
+  /**
+   * Mostra configuração atual de logging
+   */
+  showLogConfig(): void {
+    console.group('⚙️ Log Configuration')
+    
+    const config = logManager.getConfig()
+    const registry = logManager.getComponentRegistry()
+    
+    console.log('🌍 Environment:', config.environment)
+    console.log('📊 Global Level:', config.globalLevel)
+    console.log('🔇 Quiet Mode:', config.quietMode)
+    console.log('🐛 Debug Mode:', config.debugMode)
+    console.log('💾 Persist Settings:', config.persistSettings)
+    console.log('')
+    
+    console.log('📦 Component Levels:')
+    Object.entries(registry).forEach(([name, info]) => {
+      const effectiveLevel = logManager.getEffectiveLevel(name)
+      console.log(`  ${name}: ${effectiveLevel} (default: ${info.defaultLevel})`)
+    })
+    
+    console.groupEnd()
+  }
+
+  /**
+   * Ativa modo silencioso
+   */
+  enableQuietMode(): void {
+    logManager.enableQuietMode()
+    console.log('🔇 Modo silencioso ativado - apenas erros críticos serão exibidos')
+  }
+
+  /**
+   * Ativa modo debug
+   */
+  enableDebugMode(): void {
+    logManager.enableDebugMode()
+    console.log('🐛 Modo debug ativado - todos os logs serão exibidos')
+  }
+
+  /**
+   * Ativa modo normal
+   */
+  enableNormalMode(): void {
+    logManager.enableNormalMode()
+    console.log('📝 Modo normal ativado - logs baseados na configuração padrão')
+  }
+
+  /**
    * Mostra ajuda
    */
   help(): void {
@@ -386,6 +461,15 @@ class ConsoleCommandsImpl implements ConsoleCommands {
     console.log('  debug.exportLogs()        - Export logs to file')
     console.log('')
     
+    console.log('⚙️ Log Control:')
+    console.log('  debug.setLogLevel(level)     - Set global log level')
+    console.log('  debug.setComponentLevel(component, level) - Set component level')
+    console.log('  debug.showLogConfig()        - Show current log configuration')
+    console.log('  debug.enableQuietMode()      - Enable quiet mode (errors only)')
+    console.log('  debug.enableDebugMode()      - Enable debug mode (all logs)')
+    console.log('  debug.enableNormalMode()     - Enable normal mode')
+    console.log('')
+    
     console.log('📊 Dashboard & Metrics:')
     console.log('  debug.showDashboard()     - Show visual dashboard')
     console.log('  debug.hideDashboard()     - Hide visual dashboard')
@@ -397,10 +481,20 @@ class ConsoleCommandsImpl implements ConsoleCommands {
     console.log('  debug.reset()             - Reset all data')
     console.log('')
     
+    console.log('📊 Available Log Levels:')
+    console.log('  SILENT  - No logs')
+    console.log('  ERROR   - Only errors')
+    console.log('  WARN    - Warnings and errors')
+    console.log('  INFO    - Info, warnings and errors')
+    console.log('  DEBUG   - Debug and above')
+    console.log('  VERBOSE - All logs including trace')
+    console.log('')
+    
     console.log('💡 Tips:')
     console.log('  - Use Ctrl+Shift+D to toggle dashboard')
     console.log('  - All commands return promises where applicable')
     console.log('  - Logs are automatically persisted in localStorage')
+    console.log('  - Use debug.showLogConfig() to see current settings')
     
     console.groupEnd()
   }
@@ -452,14 +546,23 @@ class ConsoleCommandsImpl implements ConsoleCommands {
 // Instância singleton
 const consoleCommands = new ConsoleCommandsImpl()
 
+import { EnvironmentUtils } from '@/lib/utils/environment'
+import { createLogger } from '@/lib/logger-factory'
+
+const logger = createLogger('ConsoleCommands', 'ERROR', 'Comandos de console')
+
 // Adicionar ao window para acesso global (apenas desenvolvimento)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  (window as any).debug = consoleCommands
-  
-  // Mostrar ajuda automaticamente
-  setTimeout(() => {
-    console.log('🛠️ Debug commands loaded! Type debug.help() for available commands')
-  }, 2000)
-}
+EnvironmentUtils.onlyInDevelopment(() => {
+  EnvironmentUtils.onlyInClient(() => {
+    (window as any).debug = consoleCommands
+    
+    // Mostrar ajuda automaticamente apenas se debug estiver habilitado
+    setTimeout(() => {
+      if (logger.isEnabled('DEBUG')) {
+        logger.debug('Debug commands loaded! Type debug.help() for available commands')
+      }
+    }, 2000)
+  })
+})
 
 export default consoleCommands

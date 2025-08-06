@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import {

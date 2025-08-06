@@ -2,8 +2,12 @@
  * Emergency Stop - Para monitoramento em caso de loop
  */
 
+import { createLogger } from '@/lib/logger-factory'
+
+const logger = createLogger('EmergencyStop', 'ERROR', 'Sistema de parada de emergência')
+
 export async function emergencyStop() {
-  console.log('🚨 EMERGENCY STOP: Parando todos os monitoramentos')
+  // Log removido - só aparece quando realmente executado pelo usuário
   
   try {
     const { default: userStateManager } = await import("@/lib/user-state-manager")
@@ -12,17 +16,17 @@ export async function emergencyStop() {
     userStateManager.stopHealthCheck()
     
     // NÃO limpar dados automaticamente - apenas parar monitoramentos
-    console.log('✅ EMERGENCY STOP: Monitoramentos parados (dados preservados)')
+    // Log removido - sucesso é implícito pelo return true
     
     return true
   } catch (error) {
-    console.error('❌ EMERGENCY STOP: Erro ao parar monitoramentos', error)
+    logger.error('EMERGENCY STOP: Erro ao parar monitoramentos', {}, error)
     return false
   }
 }
 
 export async function emergencyReset() {
-  console.log('🔄 EMERGENCY RESET: Resetando sistema completo')
+  // Log removido - só aparece quando realmente executado pelo usuário
   
   try {
     await emergencyStop()
@@ -34,16 +38,21 @@ export async function emergencyReset() {
     
     return true
   } catch (error) {
-    console.error('❌ EMERGENCY RESET: Erro no reset', error)
+    logger.error('EMERGENCY RESET: Erro no reset', {}, error)
     return false
   }
 }
 
-// Adicionar ao window para acesso imediato
-if (typeof window !== 'undefined') {
+import { EnvironmentUtils } from '@/lib/utils/environment'
+
+// Adicionar ao window para acesso imediato (apenas em desenvolvimento)
+EnvironmentUtils.onlyInClient(() => {
   (window as any).emergencyStop = emergencyStop
   (window as any).emergencyReset = emergencyReset
   
-  console.log('🚨 EMERGENCY STOP disponível: execute emergencyStop() para parar loops')
-  console.log('🔄 EMERGENCY RESET disponível: execute emergencyReset() para reset completo')
-}
+  // Logs de disponibilidade apenas em desenvolvimento
+  EnvironmentUtils.onlyInDevelopment(() => {
+    logger.debug('EMERGENCY STOP disponível: execute emergencyStop() para parar loops')
+    logger.debug('EMERGENCY RESET disponível: execute emergencyReset() para reset completo')
+  })
+})

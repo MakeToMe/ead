@@ -101,15 +101,24 @@ export function showDebugCommands() {
   console.log('💡 Dica: Execute testConsistencyDetection() para um teste completo')
 }
 
+import { EnvironmentUtils } from '@/lib/utils/environment'
+import { createLogger } from '@/lib/logger-factory'
+
+const logger = createLogger('ConsistencyDetection', 'ERROR', 'Detecção de inconsistências')
+
 // Adicionar ao window para fácil acesso (apenas desenvolvimento)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  (window as any).testConsistencyDetection = testConsistencyDetection;
-  (window as any).showDebugCommands = showDebugCommands;
-  
-  // Mostrar comandos automaticamente
-  setTimeout(() => {
-    console.log('🛠️ Ferramentas de debug carregadas!')
-    console.log('Execute showDebugCommands() para ver todos os comandos disponíveis')
-    console.log('Execute testConsistencyDetection() para testar a detecção automática')
-  }, 1000)
-}
+EnvironmentUtils.onlyInDevelopment(() => {
+  EnvironmentUtils.onlyInClient(() => {
+    (window as any).testConsistencyDetection = testConsistencyDetection;
+    (window as any).showDebugCommands = showDebugCommands;
+    
+    // Mostrar comandos automaticamente apenas se debug estiver habilitado
+    setTimeout(() => {
+      if (logger.isEnabled('DEBUG')) {
+        logger.debug('Ferramentas de debug carregadas!')
+        logger.debug('Execute showDebugCommands() para ver todos os comandos disponíveis')
+        logger.debug('Execute testConsistencyDetection() para testar a detecção automática')
+      }
+    }, 1000)
+  })
+})

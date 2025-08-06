@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
 import { buscarCertificadosAluno } from "./actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

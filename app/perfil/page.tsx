@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import type { User } from "@/lib/auth-service"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
+import type { User } from "@/lib/auth-service-v2"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,7 +31,7 @@ import VerificacaoContato from "./components/verificacao-contato"
 import SocialLinksCard from "./components/social-links-card"
 
 export default function PerfilPage() {
-  const { user: authUser, isLoading: authLoading } = useAuth()
+  const { user: authUser, isLoading: authLoading, updateProfilePhoto } = useAuth()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -188,6 +188,8 @@ export default function PerfilPage() {
       setUser({ ...user, url_foto: filePath })
       // Usar o hook para atualizar a foto
       await updatePhoto(filePath)
+      // Notificar o AuthContext sobre a mudança
+      updateProfilePhoto(filePath)
     }
   }
 

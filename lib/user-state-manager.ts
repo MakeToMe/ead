@@ -10,6 +10,9 @@
 
 import type { User } from "@/lib/auth-client"
 import enhancedLogger from "@/lib/enhanced-logger"
+import { createLogger } from '@/lib/logger-factory'
+
+const logger = createLogger('UserStateManager', 'INFO', 'Gerenciador de estado do usuário')
 
 // Tipos para eventos do usuário
 export interface UserEvent {
@@ -54,19 +57,19 @@ class UserStateManager {
   async initialize(): Promise<void> {
     const startTime = Date.now()
     enhancedLogger.info('UserStateManager', 'Inicializando UserStateManager')
-    console.log('🚀 UserStateManager: Inicializando...')
+    logger.debug('Inicializando...')
     
     this.state.isLoading = true
     this.notifySubscribers()
     
     try {
       // Tentar carregar dados diretamente - se falhar, não há sessão
-      console.log('🔄 UserStateManager: Tentando carregar dados do usuário')
+      logger.debug('Tentando carregar dados do usuário')
       
       const freshUser = await this.refreshUser()
       
       if (!freshUser) {
-        console.log('ℹ️ UserStateManager: Nenhum usuário encontrado')
+        logger.debug('Nenhum usuário encontrado')
         this.state.isLoading = false
         this.state.user = null
         this.notifySubscribers()
@@ -86,7 +89,7 @@ class UserStateManager {
           nome: freshUser.nome
         })
         
-        console.log('✅ UserStateManager: Inicialização bem-sucedida', { 
+        logger.info('Inicialização bem-sucedida', { 
           userId: freshUser.uid,
           perfil: freshUser.perfis,
           nome: freshUser.nome
@@ -97,8 +100,8 @@ class UserStateManager {
         this.startHealthCheck()
       } else {
         enhancedLogger.warn('UserStateManager', 'Nenhum usuário encontrado na inicialização')
-        console.warn('⚠️ UserStateManager: Nenhum usuário encontrado na inicialização')
-        console.log('ℹ️ UserStateManager: Monitoramento automático não será iniciado sem usuário autenticado')
+        logger.warn('Nenhum usuário encontrado na inicialização')
+        logger.debug('Monitoramento automático não será iniciado sem usuário autenticado')
       }
     } catch (error) {
       console.error('❌ UserStateManager: Erro na inicialização', error)
@@ -109,7 +112,7 @@ class UserStateManager {
         const cachedUser = getCurrentClientUser()
         
         if (cachedUser) {
-          console.log('💾 UserStateManager: Usando dados em cache como fallback', { 
+          logger.info('Usando dados em cache como fallback', { 
             userId: cachedUser.uid,
             perfil: cachedUser.perfis,
             nome: cachedUser.nome

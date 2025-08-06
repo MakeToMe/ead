@@ -3,8 +3,8 @@
 import type React from "react"
 import { usePathname } from "next/navigation"
 import DashboardSidebar from "@/app/dashboard/components/dashboard-sidebar"
-import AuthGuard from "@/components/auth-guard"
-import { useAuth } from "@/contexts/auth-context"
+import AuthGuardV2 from "@/components/auth-guard-v2"
+import { useAuthV2 } from "@/contexts/auth-context-v2"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -19,7 +19,7 @@ interface DashboardLayoutProps {
  * - AuthGuard cuida da autenticação
  */
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user } = useAuth()
+  const { user } = useAuthV2()
   const pathname = usePathname()
 
   // Verifica se estamos em uma rota do dashboard que precisa de proteção
@@ -45,9 +45,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return <>{children}</>
   }
 
-  // Para rotas do dashboard, usar AuthGuard com loading customizado
+  // Para rotas do dashboard, usar AuthGuardV2 com loading customizado
   return (
-    <AuthGuard
+    <AuthGuardV2
       fallback={<DashboardLoadingScreen />}
       redirectTo="/"
     >
@@ -65,7 +65,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </main>
         </div>
       )}
-    </AuthGuard>
+    </AuthGuardV2>
   )
 }
 

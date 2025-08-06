@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const { data: newUser, error } = await supabase
       .from("users")
       .insert({ nome: name, email, senha: hashed, perfis: "aluno" })
-      .select("uid, nome, email, perfis, criado_em")
+      .select("uid, nome, email, perfis, criado_em, url_foto")
       .single();
 
         if (error || !newUser) {

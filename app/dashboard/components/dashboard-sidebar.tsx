@@ -19,7 +19,7 @@ import {
   Award,
 } from "lucide-react"
 import { useMobile } from "@/hooks/use-mobile"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuthV2 } from "@/contexts/auth-context-v2"
 import { usePhotoDisplay } from "@/hooks/use-photo"
 
 interface DashboardSidebarProps {
@@ -28,12 +28,12 @@ interface DashboardSidebarProps {
 
 export default function DashboardSidebar({ user: initialUser }: DashboardSidebarProps) {
   // Usar dados do hook otimizado
-  const { user, signOut } = useAuth()
+  const { user, signOut, profilePhotoUrl } = useAuthV2()
   
-  // Usar hook de foto unificado
+  // Usar hook de foto unificado, priorizando o profilePhotoUrl do contexto
   const { photoUrl, fallbackInitial, isLoading: photoLoading, hasError } = usePhotoDisplay(
     user?.uid,
-    user?.url_foto,
+    profilePhotoUrl || user?.url_foto,
     user?.nome
   )
   
@@ -44,27 +44,7 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
   const router = useRouter()
   const isMobile = useMobile()
 
-  // Log detalhado dos dados recebidos (apenas quando muda)
-  useEffect(() => {
-    if (user?.uid) {
-      console.log('🎯 DashboardSidebar: Usuário carregado', {
-        userId: user.uid,
-        nome: user.nome,
-        perfil: user.perfis
-      })
-    }
-  }, [user?.uid]) // Apenas quando o ID do usuário muda
-
-  // Log da foto apenas quando há mudanças significativas
-  useEffect(() => {
-    if (user?.uid && (photoUrl || hasError)) {
-      console.log('📷 DashboardSidebar: Foto carregada', { 
-        userId: user.uid,
-        hasPhoto: !!photoUrl,
-        hasError
-      })
-    }
-  }, [user?.uid, !!photoUrl, hasError]) // Apenas mudanças significativas
+  // Logs removidos - dados do usuário e foto são logados apenas em caso de erro
 
   // Auto-collapse em telas pequenas, mas respeita escolha manual em desktop
   useEffect(() => {
@@ -77,13 +57,9 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
   }, [isMobile, manuallyCollapsed])
 
   const handleLogout = async () => {
-    console.log('🚪 DashboardSidebar: Iniciando logout')
-    
     try {
       // AuthService cuida de tudo: servidor, cache, cookies, etc.
       await signOut()
-      
-      console.log('✅ DashboardSidebar: Logout bem-sucedido')
       
       // Redirecionar para página inicial
       router.push("/")
@@ -208,22 +184,36 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
               className="flex flex-col items-center text-center space-y-3"
             >
               {/* Foto do usuário */}
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-slate-700 rounded-full flex items-center justify-center overflow-hidden">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-slate-700 rounded-full flex items-center justify-center overflow-hidden relative">
                 {photoLoading ? (
                   <div className="w-full h-full flex items-center justify-center">
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                ) : photoUrl ? (
-                  <img
-                    src={photoUrl}
-                    alt={user?.nome}
-                    className="w-full h-full object-cover"
-                    onError={() => {
-                      console.log("❌ Erro ao carregar imagem, usando fallback")
-                    }}
-                  />
                 ) : (
-                  <span className="text-white font-bold text-xl">{fallbackInitial}</span>
+                  <>
+                    {photoUrl && !hasError && (
+                      <img
+                        src={photoUrl}
+                        alt={user?.nome}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.log("❌ Erro ao carregar imagem, usando fallback")
+                          // Esconder a imagem e mostrar fallback
+                          const img = e.target as HTMLImageElement
+                          img.style.display = 'none'
+                          // Mostrar fallback
+                          const fallback = img.nextElementSibling as HTMLElement
+                          if (fallback) fallback.style.display = 'flex'
+                        }}
+                      />
+                    )}
+                    <span 
+                      className="text-white font-bold text-xl absolute inset-0 flex items-center justify-center"
+                      style={{ display: (!photoUrl || hasError) ? 'flex' : 'none' }}
+                    >
+                      {fallbackInitial}
+                    </span>
+                  </>
                 )}
               </div>
 
@@ -242,20 +232,34 @@ export default function DashboardSidebar({ user: initialUser }: DashboardSidebar
               transition={{ duration: 0.2 }}
               className="flex justify-center"
             >
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-700 rounded-full flex items-center justify-center overflow-hidden">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-slate-700 rounded-full flex items-center justify-center overflow-hidden relative">
                 {photoLoading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : photoUrl ? (
-                  <img
-                    src={photoUrl}
-                    alt={user?.nome}
-                    className="w-full h-full object-cover"
-                    onError={() => {
-                      console.log("❌ Erro ao carregar imagem colapsada, usando fallback")
-                    }}
-                  />
                 ) : (
-                  <span className="text-white font-bold text-sm">{fallbackInitial}</span>
+                  <>
+                    {photoUrl && !hasError && (
+                      <img
+                        src={photoUrl}
+                        alt={user?.nome}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.log("❌ Erro ao carregar imagem colapsada, usando fallback")
+                          // Esconder a imagem e mostrar fallback
+                          const img = e.target as HTMLImageElement
+                          img.style.display = 'none'
+                          // Mostrar fallback
+                          const fallback = img.nextElementSibling as HTMLElement
+                          if (fallback) fallback.style.display = 'flex'
+                        }}
+                      />
+                    )}
+                    <span 
+                      className="text-white font-bold text-sm absolute inset-0 flex items-center justify-center"
+                      style={{ display: (!photoUrl || hasError) ? 'flex' : 'none' }}
+                    >
+                      {fallbackInitial}
+                    </span>
+                  </>
                 )}
               </div>
             </motion.div>

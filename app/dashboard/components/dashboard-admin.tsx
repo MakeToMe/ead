@@ -10,18 +10,8 @@ import { getSignedPhotoUrl } from "./sidebar-actions"
 import type { User } from "@/lib/auth-service"
 import { getUserFresh } from "./sidebar-actions"
 
-// URL da imagem padrão - será carregada dinamicamente
-let DEFAULT_IMAGE_URL = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
-
-// Função para carregar a URL padrão dinamicamente
-async function loadDefaultImageUrl() {
-  try {
-    const { getDefaultImageUrlClient } = await import("@/lib/minio-config")
-    DEFAULT_IMAGE_URL = getDefaultImageUrlClient()
-  } catch (error) {
-    console.error("Erro ao carregar URL padrão:", error)
-  }
-}
+// Placeholder simples - sem carregamento dinâmico
+const DEFAULT_IMAGE_URL = "/placeholder.svg"
 
 interface DashboardAdminProps {
   user: User
@@ -37,6 +27,7 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
   const [refreshing, setRefreshing] = useState(false)
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null)
   const [photoLoading, setPhotoLoading] = useState(false)
+
   const isMobile = useMobile()
 
   // Carregar dados frescos do usuário e sua foto
@@ -111,14 +102,8 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
 
   const isAdmin = user.perfis === "admin"
 
-  // Determinar qual foto usar
-  const getHeroImage = () => {
-    if (userPhotoUrl) {
-      return userPhotoUrl
-    }
-    loadDefaultImageUrl()
-    return DEFAULT_IMAGE_URL
-  }
+  // Determinar qual foto usar (sem carregamento dinâmico)
+  const heroImageUrl = userPhotoUrl || DEFAULT_IMAGE_URL
 
   return (
     <motion.div className="p-4 md:p-8" initial="hidden" animate="visible" variants={pageVariants}>
@@ -153,7 +138,7 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
                         </div>
                       ) : (
                         <img
-                          src={getHeroImage() || "/placeholder.svg"}
+                          src={heroImageUrl || "/placeholder.svg"}
                           alt="Foto do instrutor"
                           className="w-24 h-32 object-cover rounded-xl"
                           onError={(e) => {
@@ -184,7 +169,7 @@ export function DashboardAdmin({ user }: DashboardAdminProps) {
                         </div>
                       ) : (
                         <img
-                          src={getHeroImage() || "/placeholder.svg"}
+                          src={heroImageUrl || "/placeholder.svg"}
                           alt="Foto do instrutor"
                           className="w-32 h-44 md:w-36 md:h-48 object-cover rounded-xl"
                           onError={(e) => {

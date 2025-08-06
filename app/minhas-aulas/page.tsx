@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import type { User } from "@/lib/auth-service"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
+import type { User } from "@/lib/auth-service-v2"
 import { motion } from "framer-motion"
 import { PlayCircle, PlusCircle, Edit, Calendar, Clock, Trash2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -43,7 +43,10 @@ interface EditandoModulo {
 const ITENS_POR_PAGINA = 6
 
 export default function MinhasAulasPage() {
-  const { user: authUser, isLoading: authLoading, hasRole } = useAuth()
+  const { user: authUser, isLoading: authLoading } = useAuth()
+  
+  // Helper para verificar role
+  const hasRole = (role: string) => authUser?.perfis.includes(role) || false
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [aulas, setAulas] = useState<Aula[]>([])

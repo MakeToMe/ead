@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getAllUsers, updateUserProfile } from "./actions"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
 
 interface User {
   uid: string
@@ -19,6 +19,7 @@ interface User {
   mail_valid: boolean
   wpp_valid: boolean
   photoUrl?: string
+  url_foto?: string
   criado_em: string
 }
 

@@ -14,6 +14,7 @@ export interface User {
   bio?: string
   criado_em: string
   atualizado_em: string
+  url_foto?: string
 }
 
 // Função para hash da senha

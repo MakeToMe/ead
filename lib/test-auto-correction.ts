@@ -283,15 +283,24 @@ export function showAutoCorrectionCommands() {
   console.log('💡 Dica: Execute testAutoCorrection() para um teste completo')
 }
 
+import { EnvironmentUtils } from '@/lib/utils/environment'
+import { createLogger } from '@/lib/logger-factory'
+
+const logger = createLogger('AutoCorrection', 'ERROR', 'Auto-correção de dados')
+
 // Adicionar ao window para fácil acesso (apenas desenvolvimento)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  (window as any).testAutoCorrection = testAutoCorrection;
-  (window as any).showAutoCorrectionCommands = showAutoCorrectionCommands;
-  
-  // Mostrar comandos automaticamente
-  setTimeout(() => {
-    console.log('🔧 Ferramentas de auto-correção carregadas!')
-    console.log('Execute showAutoCorrectionCommands() para ver todos os comandos disponíveis')
-    console.log('Execute testAutoCorrection() para testar a auto-correção')
-  }, 1500)
-}
+EnvironmentUtils.onlyInDevelopment(() => {
+  EnvironmentUtils.onlyInClient(() => {
+    (window as any).testAutoCorrection = testAutoCorrection;
+    (window as any).showAutoCorrectionCommands = showAutoCorrectionCommands;
+    
+    // Mostrar comandos automaticamente apenas se debug estiver habilitado
+    setTimeout(() => {
+      if (logger.isEnabled('DEBUG')) {
+        logger.debug('Ferramentas de auto-correção carregadas!')
+        logger.debug('Execute showAutoCorrectionCommands() para ver todos os comandos disponíveis')
+        logger.debug('Execute testAutoCorrection() para testar a auto-correção')
+      }
+    }, 1500)
+  })
+})

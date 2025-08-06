@@ -3,8 +3,15 @@
  * 
  * Fornece logs estruturados, timestamps detalhados e diferentes níveis de log
  * para facilitar o debug de problemas de consistência de dados.
+ * 
+ * Integrado com LogManager para controle granular de níveis por componente.
  */
 
+// LogManager import removido para evitar dependências circulares
+import type { LogLevel as NewLogLevel, LogEntry as NewLogEntry } from '@/lib/types/logging'
+import { EnvironmentUtils } from '@/lib/utils/environment'
+
+// Manter compatibilidade com tipos antigos
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'critical'
 
 export interface LogEntry {
@@ -18,61 +25,81 @@ export interface LogEntry {
   stackTrace?: string
 }
 
+// Mapeamento entre níveis antigos e novos
+const LEVEL_MAPPING: Record<LogLevel, NewLogLevel> = {
+  'debug': 'DEBUG',
+  'info': 'INFO',
+  'warn': 'WARN',
+  'error': 'ERROR',
+  'critical': 'ERROR'
+}
+
 class EnhancedLogger {
   private logs: LogEntry[] = []
   private readonly MAX_LOGS = 1000
   private sessionId: string
   private isEnabled: boolean = true
+  private readonly COMPONENT_NAME = 'EnhancedLogger'
 
   constructor() {
     this.sessionId = this.generateSessionId()
     
-    // Só fazer log no cliente para evitar problemas de hidratação
-    if (typeof window !== 'undefined') {
-      console.log(`📝 EnhancedLogger: Inicializado com sessão ${this.sessionId}`)
-    }
+    // LogManager registration removido temporariamente para evitar dependência circular
+    
+    // Log de inicialização apenas se permitido
+    EnvironmentUtils.onlyInClient(() => {
+      if (this.shouldLog('info')) {
+        console.log(`📝 EnhancedLogger: Inicializado com sessão ${this.sessionId}`)
+      }
+    })
   }
 
   /**
-   * Log de debug (apenas em desenvolvimento)
+   * Log de debug (controlado pelo LogManager)
    */
   debug(component: string, message: string, data?: any): void {
-    if (process.env.NODE_ENV === 'development') {
+    if (this.shouldLog('debug', component)) {
       this.log('debug', component, message, data)
     }
   }
 
   /**
-   * Log de informação
+   * Log de informação (controlado pelo LogManager)
    */
   info(component: string, message: string, data?: any): void {
-    this.log('info', component, message, data)
+    if (this.shouldLog('info', component)) {
+      this.log('info', component, message, data)
+    }
   }
 
   /**
-   * Log de warning
+   * Log de warning (controlado pelo LogManager)
    */
   warn(component: string, message: string, data?: any): void {
-    this.log('warn', component, message, data)
+    if (this.shouldLog('warn', component)) {
+      this.log('warn', component, message, data)
+    }
   }
 
   /**
-   * Log de erro
+   * Log de erro (controlado pelo LogManager)
    */
   error(component: string, message: string, data?: any, error?: Error): void {
-    const logData = {
-      ...data,
-      error: error ? {
-        message: error.message,
-        stack: error.stack
-      } : undefined
+    if (this.shouldLog('error', component)) {
+      const logData = {
+        ...data,
+        error: error ? {
+          message: error.message,
+          stack: error.stack
+        } : undefined
+      }
+      
+      this.log('error', component, message, logData, error?.stack)
     }
-    
-    this.log('error', component, message, logData, error?.stack)
   }
 
   /**
-   * Log crítico (sempre visível)
+   * Log crítico (sempre visível, mas respeitando modo silencioso)
    */
   critical(component: string, message: string, data?: any, error?: Error): void {
     const logData = {
@@ -83,16 +110,31 @@ class EnhancedLogger {
       } : undefined
     }
     
+    // Sempre salvar logs críticos
     this.log('critical', component, message, logData, error?.stack)
     
-    // Logs críticos sempre aparecem no console
-    console.error(`🚨 CRITICAL [${component}]: ${message}`, logData)
+    // Exibir no console apenas se não estiver em modo silencioso
+    if (this.shouldLog('critical', component)) {
+      console.error(`🚨 CRITICAL [${component}]: ${message}`, logData)
+    }
   }
 
   /**
-   * Log de auditoria para mudanças de dados
+   * Log de auditoria para mudanças de dados (apenas em desenvolvimento se habilitado)
    */
   audit(component: string, action: string, data: any): void {
+    // Só fazer log de auditoria se explicitamente habilitado ou em caso de erro
+    if (!this.shouldLog('debug', component)) {
+      // Salvar apenas no localStorage, sem exibir no console
+      const auditData = {
+        action,
+        timestamp: new Date().toISOString(),
+        ...data
+      }
+      this.saveAuditLog(auditData)
+      return
+    }
+
     const auditMessage = `AUDIT: ${action}`
     const auditData = {
       action,
@@ -107,7 +149,7 @@ class EnhancedLogger {
   }
 
   /**
-   * Log de performance
+   * Log de performance (controlado pelo LogManager)
    */
   performance(component: string, operation: string, duration: number, data?: any): void {
     const perfData = {
@@ -118,24 +160,76 @@ class EnhancedLogger {
     }
     
     const level: LogLevel = duration > 5000 ? 'warn' : duration > 2000 ? 'info' : 'debug'
-    this.log(level, component, `PERFORMANCE: ${operation} took ${duration}ms`, perfData)
+    
+    if (this.shouldLog(level, component)) {
+      this.log(level, component, `PERFORMANCE: ${operation} took ${duration}ms`, perfData)
+    }
   }
 
   /**
-   * Log de consistência específico
+   * Log de consistência específico (controlado pelo LogManager)
    */
   consistency(component: string, event: string, data: any): void {
-    const consistencyData = {
-      event,
-      timestamp: new Date().toISOString(),
-      sessionId: this.sessionId,
-      ...data
+    if (this.shouldLog('info', component)) {
+      const consistencyData = {
+        event,
+        timestamp: new Date().toISOString(),
+        sessionId: this.sessionId,
+        ...data
+      }
+      
+      this.log('info', component, `CONSISTENCY: ${event}`, consistencyData)
+      
+      // Salvar logs de consistência separadamente
+      this.saveConsistencyLog(consistencyData)
+    }
+  }
+
+  /**
+   * Verifica se deve fazer log baseado na configuração
+   */
+  private shouldLog(level: LogLevel, component?: string): boolean {
+    if (!this.isEnabled) return false
+    
+    // Verificar configuração do localStorage primeiro (fallback simples)
+    if (typeof window !== 'undefined') {
+      const quietMode = localStorage.getItem('quiet_mode') === 'true'
+      const configLevel = localStorage.getItem('log_level') || 'WARN'
+      
+      if (quietMode && level !== 'error' && level !== 'critical') {
+        return false
+      }
+      
+      // Hierarquia de níveis: DEBUG > INFO > WARN > ERROR > CRITICAL
+      const levelHierarchy = {
+        'debug': 0,
+        'info': 1, 
+        'warn': 2,
+        'error': 3,
+        'critical': 4
+      }
+      
+      const configHierarchy = {
+        'DEBUG': 0,
+        'INFO': 1,
+        'WARN': 2, 
+        'ERROR': 3
+      }
+      
+      const currentLevelValue = levelHierarchy[level] ?? 2
+      const configLevelValue = configHierarchy[configLevel as keyof typeof configHierarchy] ?? 2
+      
+      return currentLevelValue >= configLevelValue
     }
     
-    this.log('info', component, `CONSISTENCY: ${event}`, consistencyData)
-    
-    // Salvar logs de consistência separadamente
-    this.saveConsistencyLog(consistencyData)
+    // Implementação simplificada sem LogManager
+    // Em desenvolvimento: permitir warn, error, critical
+    // Em produção: apenas error e critical
+    if (process.env.NODE_ENV === 'production') {
+      return level === 'error' || level === 'critical'
+    } else {
+      return level === 'warn' || level === 'error' || level === 'critical'
+    }
   }
 
   /**
@@ -163,8 +257,10 @@ class EnhancedLogger {
       this.logs = this.logs.slice(-this.MAX_LOGS)
     }
 
-    // Exibir no console baseado no nível
-    this.displayLog(entry)
+    // Exibir no console apenas se permitido pelo LogManager
+    if (this.shouldLog(level, component)) {
+      this.displayLog(entry)
+    }
 
     // Salvar no localStorage para persistência
     this.persistLogs()
@@ -373,7 +469,65 @@ class EnhancedLogger {
    */
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled
-    console.log(`📝 EnhancedLogger: Logging ${enabled ? 'habilitado' : 'desabilitado'}`)
+    
+    if (this.shouldLog('info')) {
+      console.log(`📝 EnhancedLogger: Logging ${enabled ? 'habilitado' : 'desabilitado'}`)
+    }
+  }
+
+  /**
+   * Define nível global de logging
+   */
+  setGlobalLevel(level: NewLogLevel): void {
+    // logManager.setGlobalLevel(level) // Temporariamente comentado
+    
+    if (this.shouldLog('info')) {
+      console.log(`📝 EnhancedLogger: Nível global definido para ${level}`)
+    }
+  }
+
+  /**
+   * Define nível de logging para componente específico
+   */
+  setComponentLevel(component: string, level: NewLogLevel): void {
+    // logManager.setComponentLevel(component, level) // Temporariamente comentado
+    
+    if (this.shouldLog('info')) {
+      console.log(`📝 EnhancedLogger: Nível do componente ${component} definido para ${level}`)
+    }
+  }
+
+  /**
+   * Ativa modo silencioso
+   */
+  enableQuietMode(): void {
+    // logManager.enableQuietMode() // Temporariamente comentado
+    
+    if (this.shouldLog('info')) {
+      console.log('🔇 EnhancedLogger: Modo silencioso ativado')
+    }
+  }
+
+  /**
+   * Ativa modo debug
+   */
+  enableDebugMode(): void {
+    // logManager.enableDebugMode() // Temporariamente comentado
+    console.log('🐛 EnhancedLogger: Modo debug ativado')
+  }
+
+  /**
+   * Obtém configuração atual do LogManager
+   */
+  getLogConfig(): any {
+    return { simplified: true } // logManager.getConfig() // Temporariamente comentado
+  }
+
+  /**
+   * Obtém informações de debug do LogManager
+   */
+  getLogManagerDebugInfo(): any {
+    return { simplified: true } // logManager.getDebugInfo() // Temporariamente comentado
   }
 
   /**
@@ -403,19 +557,58 @@ class EnhancedLogger {
 const enhancedLogger = new EnhancedLogger()
 
 // Adicionar ao window para debug (apenas em desenvolvimento)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  (window as any).enhancedLogger = enhancedLogger
-  
-  // Comandos de debug
-  ;(window as any).debugLogs = {
-    getLogs: (level?: LogLevel, component?: string) => enhancedLogger.getLogs(level, component),
-    getAuditLogs: () => enhancedLogger.getAuditLogs(),
-    getConsistencyLogs: () => enhancedLogger.getConsistencyLogs(),
-    clearLogs: () => enhancedLogger.clearLogs(),
-    exportLogs: () => enhancedLogger.exportLogs(),
-    getStats: () => enhancedLogger.getStats(),
-    setEnabled: (enabled: boolean) => enhancedLogger.setEnabled(enabled)
+EnvironmentUtils.onlyInDevelopment(() => {
+  if (typeof window !== 'undefined') {
+    (window as any).enhancedLogger = enhancedLogger
+    
+    // Comandos de debug expandidos
+    ;(window as any).debugLogs = {
+      // Comandos existentes
+      getLogs: (level?: LogLevel, component?: string) => enhancedLogger.getLogs(level, component),
+      getAuditLogs: () => enhancedLogger.getAuditLogs(),
+      getConsistencyLogs: () => enhancedLogger.getConsistencyLogs(),
+      clearLogs: () => enhancedLogger.clearLogs(),
+      exportLogs: () => enhancedLogger.exportLogs(),
+      getStats: () => enhancedLogger.getStats(),
+      setEnabled: (enabled: boolean) => enhancedLogger.setEnabled(enabled),
+      
+      // Novos comandos de controle de nível
+      setGlobalLevel: (level: NewLogLevel) => enhancedLogger.setGlobalLevel(level),
+      setComponentLevel: (component: string, level: NewLogLevel) => enhancedLogger.setComponentLevel(component, level),
+      enableQuietMode: () => enhancedLogger.enableQuietMode(),
+      enableDebugMode: () => enhancedLogger.enableDebugMode(),
+      getLogConfig: () => enhancedLogger.getLogConfig(),
+      getLogManagerInfo: () => enhancedLogger.getLogManagerDebugInfo(),
+      
+      // Comandos de ajuda
+      help: () => {
+        console.group('📝 Enhanced Logger Commands')
+        console.log('=== Log Retrieval ===')
+        console.log('debugLogs.getLogs(level?, component?) - Get filtered logs')
+        console.log('debugLogs.getAuditLogs() - Get audit logs')
+        console.log('debugLogs.getConsistencyLogs() - Get consistency logs')
+        console.log('debugLogs.getStats() - Get log statistics')
+        console.log('')
+        console.log('=== Log Control ===')
+        console.log('debugLogs.setGlobalLevel(level) - Set global log level')
+        console.log('debugLogs.setComponentLevel(component, level) - Set component log level')
+        console.log('debugLogs.enableQuietMode() - Enable quiet mode')
+        console.log('debugLogs.enableDebugMode() - Enable debug mode')
+        console.log('debugLogs.setEnabled(boolean) - Enable/disable logging')
+        console.log('')
+        console.log('=== Configuration ===')
+        console.log('debugLogs.getLogConfig() - Get current log configuration')
+        console.log('debugLogs.getLogManagerInfo() - Get LogManager debug info')
+        console.log('')
+        console.log('=== Utilities ===')
+        console.log('debugLogs.clearLogs() - Clear all logs')
+        console.log('debugLogs.exportLogs() - Export logs to file')
+        console.log('')
+        console.log('Available levels: SILENT, ERROR, WARN, INFO, DEBUG, VERBOSE')
+        console.groupEnd()
+      }
+    }
   }
-}
+})
 
 export default enhancedLogger

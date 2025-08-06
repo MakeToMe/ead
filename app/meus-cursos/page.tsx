@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import type { User } from "@/lib/auth-service"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
+import type { User } from "@/lib/auth-service-v2"
 import { motion } from "framer-motion"
 import { PlusCircle, BookOpen } from "lucide-react"
 import ModalAdicionarCurso from "./components/modal-adicionar-curso"
@@ -27,7 +27,10 @@ interface Curso {
 const ITENS_POR_PAGINA = 6
 
 export default function MeusCursosPage() {
-  const { user, isLoading: authLoading, hasRole } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
+  
+  // Helper para verificar role
+  const hasRole = (role: string) => user?.perfis.includes(role) || false
   const [cursos, setCursos] = useState<Curso[]>([])
   const [loadingCursos, setLoadingCursos] = useState(false)
   const [paginaAtual, setPaginaAtual] = useState(1)

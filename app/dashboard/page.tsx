@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import type { User } from "@/lib/auth-service"
+import { useAuthV2 } from "@/contexts/auth-context-v2"
+import type { User } from "@/lib/auth-service-v2"
 import { getUserFreshData, getDashboardStats, marcarAtividadesComoVisualizadas } from "./actions"
 import { DashboardAdmin } from "./components/dashboard-admin"
 import { useMobile } from "@/hooks/use-mobile"
@@ -11,18 +11,8 @@ import { RefreshCw, Play, CheckCircle, Award, BookOpen, Clock, Calendar, Bug } f
 import Link from "next/link"
 import { getSignedPhotoUrl } from "./components/sidebar-actions"
 
-// URL da imagem padrão - será carregada dinamicamente
-let DEFAULT_IMAGE_URL = "https://avs3.guardia.work/rar/DM011730_copy-removebg-preview.png"
-
-// Função para carregar a URL padrão dinamicamente
-async function loadDefaultImageUrl() {
-  try {
-    const { getDefaultImageUrlClient } = await import("@/lib/minio-config")
-    DEFAULT_IMAGE_URL = getDefaultImageUrlClient()
-  } catch (error) {
-    console.error("Erro ao carregar URL padrão:", error)
-  }
-}
+// Placeholder simples - sem carregamento dinâmico
+const DEFAULT_IMAGE_URL = "/placeholder.svg"
 
 // Tipos para atividades recentes
 interface Atividade {
@@ -48,6 +38,7 @@ function DashboardAluno({ user }: { user: User }) {
   const [refreshing, setRefreshing] = useState(false)
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null)
   const [photoLoading, setPhotoLoading] = useState(false)
+
   const isMobile = useMobile()
 
   // Carregar foto do usuário se for instrutor/admin
@@ -178,24 +169,10 @@ function DashboardAluno({ user }: { user: User }) {
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
   }
 
-  // Determinar qual foto usar
-  const getHeroImage = () => {
-    // console.debug("🖼️ Determinando foto para hero:")
-    // console.debug("- Perfil:", user?.perfis)
-    // console.debug("- userPhotoUrl:", userPhotoUrl)
-    // console.debug("- photoLoading:", photoLoading)
-
-    // Se for instrutor/admin e tiver foto própria, usar ela
-    if ((user?.perfis === "instrutor" || user?.perfis === "admin") && userPhotoUrl) {
-      // console.debug("✅ Usando foto personalizada do usuário")
-      return userPhotoUrl
-    }
-
-    // Caso contrário, usar a foto padrão
-    // console.debug("📷 Usando foto padrão")
-    loadDefaultImageUrl() // Carrega assincronamente, mas não bloqueia
-    return DEFAULT_IMAGE_URL
-  }
+  // Determinar qual foto usar (sem carregamento dinâmico)
+  const heroImageUrl = (user?.perfis === "instrutor" || user?.perfis === "admin") && userPhotoUrl 
+    ? userPhotoUrl 
+    : DEFAULT_IMAGE_URL
 
   return (
     <motion.div className="p-4 md:p-8" initial="hidden" animate="visible" variants={pageVariants}>
@@ -238,7 +215,7 @@ function DashboardAluno({ user }: { user: User }) {
                         </div>
                       ) : (
                         <img
-                          src={getHeroImage() || "/placeholder.svg"}
+                          src={heroImageUrl || "/placeholder.svg"}
                           alt="Foto do usuário"
                           className="w-24 h-32 object-cover rounded-xl"
                           onError={(e) => {
@@ -273,7 +250,7 @@ function DashboardAluno({ user }: { user: User }) {
                         </div>
                       ) : (
                         <img
-                          src={getHeroImage() || "/placeholder.svg"}
+                          src={heroImageUrl || "/placeholder.svg"}
                           alt="Foto do usuário"
                           className="w-32 h-44 md:w-36 md:h-48 object-cover rounded-xl"
                           onError={(e) => {
@@ -396,14 +373,9 @@ function DashboardAluno({ user }: { user: User }) {
 }
 
 export default function DashboardPage() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading } = useAuthV2()
 
-  console.log('🎯 DashboardPage: Dados do usuário', {
-    userId: user?.uid,
-    nome: user?.nome,
-    perfil: user?.perfis,
-    isLoading
-  })
+  // Log removido - dados do usuário são logados apenas em caso de erro
 
   if (isLoading) {
     return (

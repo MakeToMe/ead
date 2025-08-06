@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { Plus, Edit, Trash2, Star, Clock, MessageSquare, AlertCircle, FileText, Search, BookOpen } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuthV2 as useAuth } from "@/contexts/auth-context-v2"
 import {
   criarAnotacao,
   buscarAnotacoesAula,
